@@ -3,33 +3,34 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>環境守護者 - AI 辨識系統</title>
+    <title>環境守護者 - 相機測試</title>
     <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-database-compat.js"></script>
     <style>
-        body { font-family: sans-serif; text-align: center; padding: 50px 20px; background-color: #f0f2f5; }
-        .container { background: white; padding: 30px; border-radius: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
-        h1 { color: #2c3e50; }
-        #status { margin: 20px 0; font-weight: bold; color: #e67e22; }
-        .btn { 
-            padding: 20px 40px; font-size: 1.2rem; cursor: pointer;
-            background-color: #27ae60; color: white; border: none; 
-            border-radius: 50px; transition: 0.3s; width: 100%; max-width: 300px;
-        }
-        .btn:active { transform: scale(0.95); background-color: #219150; }
+        body { font-family: sans-serif; text-align: center; background: #222; color: white; margin: 0; padding: 20px; }
+        #video-container { position: relative; display: inline-block; width: 100%; max-width: 500px; border: 5px solid #444; border-radius: 15px; overflow: hidden; }
+        video { width: 100%; height: auto; display: block; background: black; }
+        .overlay-ui { margin-top: 20px; }
+        #status { color: #00ff00; font-weight: bold; margin-bottom: 10px; }
+        .btn { padding: 15px 30px; font-size: 1rem; background: #27ae60; color: white; border: none; border-radius: 50px; cursor: pointer; }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>環境守護者 AI</h1>
-        <p>請將鏡頭對準垃圾進行辨識</p>
-        <div id="status">等待連線中...</div>
-        
-        <button id="successBtn" class="btn">模擬 AI 辨識成功</button>
+
+    <h1>AI 掃描鏡頭測試</h1>
+    <div id="status">正在請求相機權限...</div>
+
+    <div id="video-container">
+        <video id="webcam" autoplay playsinline></video>
+    </div>
+
+    <div class="overlay-ui">
+        <p>看到畫面後，點擊下方測試通訊：</p>
+        <button id="testBtn" class="btn">測試連動 Unity</button>
     </div>
 
     <script>
-        // 使用你提供的 Firebase 配置資訊
+        // 1. Firebase 配置 (保持你之前的設定)
         const firebaseConfig = {
             apiKey: "AIzaSyAWLI1eL8c7SGwxTd06rwRFgf0_KZrjNxY",
             authDomain: "environmentguardian-bf374.firebaseapp.com",
@@ -40,30 +41,38 @@
             appId: "1:527271524460:web:aea82c6e312de800780049" 
         };
 
-        // 初始化 Firebase
         firebase.initializeApp(firebaseConfig);
         const database = firebase.database();
+
+        // 2. 相機驅動邏輯
+        const video = document.getElementById('webcam');
         const statusText = document.getElementById('status');
 
-        // 確認連線狀態
-        statusText.innerText = "系統已就緒，請點擊按鈕模擬辨識";
+        async function startCamera() {
+            try {
+                // 請求後置鏡頭 (environment)
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { facingMode: "environment" }, 
+                    audio: false 
+                });
+                video.srcObject = stream;
+                statusText.innerText = "相機已啟動";
+            } catch (err) {
+                statusText.innerText = "無法開啟相機: " + err.message;
+                statusText.style.color = "red";
+                console.error("Camera Error: ", err);
+            }
+        }
 
-        // 當按鈕被按下
-        document.getElementById('successBtn').onclick = function() {
-            statusText.innerText = "正在傳送辨識結果...";
-            
-            // 更新 Firebase 節點
-            database.ref('/').update({
-                isScanned: true
-            }).then(() => {
-                statusText.innerText = "辨識成功！Unity 視窗應已關閉";
-                statusText.style.color = "#27ae60";
-                console.log("Firebase 更新成功！");
-            }).catch((error) => {
-                statusText.innerText = "連線錯誤：" + error.message;
-                statusText.style.color = "#c0392b";
-            });
+        // 3. 測試按鈕 (保留原本功能確保通訊正常)
+        document.getElementById('testBtn').onclick = function() {
+            database.ref('/').update({ isScanned: true })
+            .then(() => alert("通訊成功！Unity 應已關閉視窗"))
+            .catch(e => alert("錯誤: " + e.message));
         };
+
+        // 頁面載入後自動啟動相機
+        window.addEventListener('load', startCamera);
     </script>
 </body>
 </html>
