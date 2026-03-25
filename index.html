@@ -3,34 +3,39 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>環境守護者 - 相機測試</title>
+    <title>環境守護者 - AI 拍照辨識</title>
     <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-database-compat.js"></script>
     <style>
         body { font-family: sans-serif; text-align: center; background: #222; color: white; margin: 0; padding: 20px; }
-        #video-container { position: relative; display: inline-block; width: 100%; max-width: 500px; border: 5px solid #444; border-radius: 15px; overflow: hidden; }
-        video { width: 100%; height: auto; display: block; background: black; }
+        #video-container { position: relative; display: inline-block; width: 100%; max-width: 500px; border: 5px solid #444; border-radius: 15px; overflow: hidden; background: #000; }
+        video { width: 100%; height: auto; display: block; }
         .overlay-ui { margin-top: 20px; }
-        #status { color: #00ff00; font-weight: bold; margin-bottom: 10px; }
-        .btn { padding: 15px 30px; font-size: 1rem; background: #27ae60; color: white; border: none; border-radius: 50px; cursor: pointer; }
+        #status { color: #00ff00; font-weight: bold; margin: 10px 0; }
+        .btn { padding: 15px 40px; font-size: 1.2rem; background: #27ae60; color: white; border: none; border-radius: 50px; cursor: pointer; transition: 0.3s; }
+        .btn:active { background: #2ecc71; transform: scale(0.95); }
+        .btn:disabled { background: #7f8c8d; cursor: not-allowed; }
+        canvas { display: none; } /* 隱藏畫布 */
     </style>
 </head>
 <body>
 
-    <h1>AI 掃描鏡頭測試</h1>
-    <div id="status">正在請求相機權限...</div>
+    <h1>AI 垃圾辨識系統</h1>
+    <div id="status">正在初始化相機...</div>
 
     <div id="video-container">
         <video id="webcam" autoplay playsinline></video>
     </div>
 
+    <canvas id="canvas"></canvas>
+
     <div class="overlay-ui">
-        <p>看到畫面後，點擊下方測試通訊：</p>
-        <button id="testBtn" class="btn">測試連動 Unity</button>
+        <p>對準垃圾後，點擊下方進行辨識：</p>
+        <button id="captureBtn" class="btn">📷 拍照並辨識</button>
     </div>
 
     <script>
-        // 1. Firebase 配置 (保持你之前的設定)
+        // 1. Firebase 配置 (保持不變)
         const firebaseConfig = {
             apiKey: "AIzaSyAWLI1eL8c7SGwxTd06rwRFgf0_KZrjNxY",
             authDomain: "environmentguardian-bf374.firebaseapp.com",
@@ -44,34 +49,76 @@
         firebase.initializeApp(firebaseConfig);
         const database = firebase.database();
 
-        // 2. 相機驅動邏輯
+        // 2. 元素選取
         const video = document.getElementById('webcam');
+        const canvas = document.getElementById('canvas');
         const statusText = document.getElementById('status');
+        const captureBtn = document.getElementById('captureBtn');
 
+        // 3. 啟動相機
         async function startCamera() {
             try {
-                // 請求後置鏡頭 (environment)
                 const stream = await navigator.mediaDevices.getUserMedia({ 
-                    video: { facingMode: "environment" }, 
+                    video: { facingMode: "environment", width: { ideal: 640 }, height: { ideal: 480 } }, 
                     audio: false 
                 });
                 video.srcObject = stream;
-                statusText.innerText = "相機已啟動";
+                statusText.innerText = "相機已啟動 - 準備辨識";
             } catch (err) {
                 statusText.innerText = "無法開啟相機: " + err.message;
                 statusText.style.color = "red";
-                console.error("Camera Error: ", err);
             }
         }
 
-        // 3. 測試按鈕 (保留原本功能確保通訊正常)
-        document.getElementById('testBtn').onclick = function() {
-            database.ref('/').update({ isScanned: true })
-            .then(() => alert("通訊成功！Unity 應已關閉視窗"))
-            .catch(e => alert("錯誤: " + e.message));
+        // 4. 拍照並上傳 Base64 邏輯
+        captureBtn.onclick = function() {
+            statusText.innerText = "正在擷取影像...";
+            captureBtn.disabled = true;
+
+            // 設定畫布大小與影片一致
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            
+            // 將影片當前畫面畫在畫布上
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+            // 【重要】將畫布轉為 Base64 字串 (使用 JPEG 格式並壓縮品質至 0.6)
+            // 這可以大幅減少資料庫負擔，加速 3060 Ti 的接收速度
+            const base64Data = canvas.toDataURL('image/jpeg', 0.6).split(',')[1];
+
+            // 5. 上傳至 Firebase Realtime Database
+            database.ref('ScanControl').update({
+                isWaitingForScan: true,
+                imgData: base64Data,
+                timestamp: Date.now()
+            })
+            .then(() => {
+                statusText.innerText = "🚀 影像已送出，等待 3060 Ti 辨識...";
+                // 監聽辨識結果
+                listenForResults();
+            })
+            .catch(e => {
+                alert("上傳失敗: " + e.message);
+                captureBtn.disabled = false;
+            });
         };
 
-        // 頁面載入後自動啟動相機
+        // 6. 監聽 Python 回傳的結果
+        function listenForResults() {
+            const resultRef = database.ref('ScanControl');
+            resultRef.on('value', (snapshot) => {
+                const data = snapshot.val();
+                if (data && data.isWaitingForScan === false && data.scannedResult) {
+                    statusText.innerText = "✅ 辨識結果：" + data.scannedResult;
+                    statusText.style.color = "#00ff00";
+                    captureBtn.disabled = false;
+                    // 停止監聽，避免重複執行
+                    // resultRef.off(); 
+                }
+            });
+        }
+
         window.addEventListener('load', startCamera);
     </script>
 </body>
