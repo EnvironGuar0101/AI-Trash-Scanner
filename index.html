@@ -15,10 +15,35 @@
         .btn { padding: 15px 40px; font-size: 1.2rem; background: #27ae60; color: white; border: none; border-radius: 50px; cursor: pointer; transition: 0.3s; }
         .btn:active { background: #2ecc71; transform: scale(0.95); }
         .btn:disabled { background: #7f8c8d; cursor: not-allowed; }
-        canvas { display: none; } /* 隱藏畫布 */
+        canvas { display: none; }
+
+        /* --- 新增：自定義彈窗樣式 --- */
+        #notice-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.85); /* 半透明黑 */
+            display: none; /* 預設隱藏 */
+            justify-content: center; align-items: center;
+            z-index: 10000; 
+            backdrop-filter: blur(5px); /* 背景模糊感 */
+        }
+        .notice-content {
+            background: #333; padding: 30px; border-radius: 20px;
+            border: 2px solid #27ae60; max-width: 80%;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }
+        .notice-content h3 { color: #27ae60; margin-top: 0; }
+        .notice-content p { line-height: 1.6; margin-bottom: 25px; color: #eee; }
     </style>
 </head>
 <body>
+
+    <div id="notice-overlay">
+        <div class="notice-content">
+            <h3>🌟 拍攝叮嚀</h3>
+            <p>請將垃圾放置於光線充足的地方再進行拍攝，以提高辨識準確度。</p>
+            <button class="btn" onclick="closeNotice()">我知道了</button>
+        </div>
+    </div>
 
     <h1>AI 垃圾辨識系統</h1>
     <div id="status">正在初始化相機...</div>
@@ -49,11 +74,11 @@
         firebase.initializeApp(firebaseConfig);
         const database = firebase.database();
 
-        // 2. 元素選取
         const video = document.getElementById('webcam');
         const canvas = document.getElementById('canvas');
         const statusText = document.getElementById('status');
         const captureBtn = document.getElementById('captureBtn');
+        const noticeOverlay = document.getElementById('notice-overlay');
 
         // 3. 啟動相機
         async function startCamera() {
@@ -65,17 +90,20 @@
                 video.srcObject = stream;
                 statusText.innerText = "相機已啟動 - 準備辨識";
 
-                // --- 新增：成功請求相機權限後跳出叮嚀 ---
-                // 延遲 500ms 跳出，確保使用者先看到相機畫面，體驗較好
+                // 修改：不使用 alert，改用顯示自定義遮罩
                 setTimeout(() => {
-                    alert("🌟 拍攝叮嚀：\n請將垃圾放置於光線充足的地方再進行拍攝，以提高辨識準確度。");
+                    noticeOverlay.style.display = 'flex';
                 }, 500);
-                // ------------------------------------
 
             } catch (err) {
                 statusText.innerText = "無法開啟相機: " + err.message;
                 statusText.style.color = "red";
             }
+        }
+
+        // 關閉叮嚀視窗
+        function closeNotice() {
+            noticeOverlay.style.display = 'none';
         }
 
         // 4. 拍照並上傳 Base64 邏輯
@@ -89,7 +117,6 @@
             const ctx = canvas.getContext('2d');
             ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-            // 壓縮品質至 0.6 以節省傳輸量
             const base64Data = canvas.toDataURL('image/jpeg', 0.6).split(',')[1];
 
             // 5. 上傳至 Firebase
