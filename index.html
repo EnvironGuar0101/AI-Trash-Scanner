@@ -35,7 +35,7 @@
     </div>
 
     <script>
-        // 1. Firebase 配置 (保持不變)
+        // 1. Firebase 配置
         const firebaseConfig = {
             apiKey: "AIzaSyAWLI1eL8c7SGwxTd06rwRFgf0_KZrjNxY",
             authDomain: "environmentguardian-bf374.firebaseapp.com",
@@ -64,6 +64,14 @@
                 });
                 video.srcObject = stream;
                 statusText.innerText = "相機已啟動 - 準備辨識";
+
+                // --- 新增：成功請求相機權限後跳出叮嚀 ---
+                // 延遲 500ms 跳出，確保使用者先看到相機畫面，體驗較好
+                setTimeout(() => {
+                    alert("🌟 拍攝叮嚀：\n請將垃圾放置於光線充足的地方再進行拍攝，以提高辨識準確度。");
+                }, 500);
+                // ------------------------------------
+
             } catch (err) {
                 statusText.innerText = "無法開啟相機: " + err.message;
                 statusText.style.color = "red";
@@ -75,19 +83,16 @@
             statusText.innerText = "正在擷取影像...";
             captureBtn.disabled = true;
 
-            // 設定畫布大小與影片一致
             canvas.width = video.videoWidth;
             canvas.height = video.videoHeight;
             
-            // 將影片當前畫面畫在畫布上
             const ctx = canvas.getContext('2d');
             ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-            // 【重要】將畫布轉為 Base64 字串 (使用 JPEG 格式並壓縮品質至 0.6)
-            // 這可以大幅減少資料庫負擔，加速 3060 Ti 的接收速度
+            // 壓縮品質至 0.6 以節省傳輸量
             const base64Data = canvas.toDataURL('image/jpeg', 0.6).split(',')[1];
 
-            // 5. 上傳至 Firebase Realtime Database
+            // 5. 上傳至 Firebase
             database.ref('ScanControl').update({
                 isWaitingForScan: true,
                 imgData: base64Data,
@@ -95,7 +100,6 @@
             })
             .then(() => {
                 statusText.innerText = "🚀 影像已送出，等待 3060 Ti 辨識...";
-                // 監聽辨識結果
                 listenForResults();
             })
             .catch(e => {
@@ -104,7 +108,7 @@
             });
         };
 
-        // 6. 監聽 Python 回傳的結果
+        // 6. 監聽 Python 回傳結果
         function listenForResults() {
             const resultRef = database.ref('ScanControl');
             resultRef.on('value', (snapshot) => {
@@ -113,8 +117,6 @@
                     statusText.innerText = "✅ 辨識結果：" + data.scannedResult;
                     statusText.style.color = "#00ff00";
                     captureBtn.disabled = false;
-                    // 停止監聽，避免重複執行
-                    // resultRef.off(); 
                 }
             });
         }
