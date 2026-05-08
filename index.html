@@ -7,62 +7,59 @@
     <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-database-compat.js"></script>
     <style>
+        /* 全域樣式修正 */
+        * { box-sizing: border-box; }
         body { font-family: sans-serif; text-align: center; background: #222; color: white; margin: 0; padding: 20px; }
+        
         #video-container { position: relative; display: inline-block; width: 100%; max-width: 500px; border: 5px solid #444; border-radius: 15px; overflow: hidden; background: #000; }
         video { width: 100%; height: auto; display: block; }
-        .overlay-ui { margin-top: 20px; display: flex; flex-direction: column; align-items: center; }
-        #status { color: #00ff00; font-weight: bold; margin: 10px 0; }
+        #status { color: #00ff00; font-weight: bold; margin: 10px 0; min-height: 1.2em; }
         
-        .button-group {
-            display: flex; align-items: center; justify-content: center;
-            gap: 15px; width: 100%; max-width: 400px;
-        }
-
-        .btn { padding: 15px 40px; font-size: 1.2rem; background: #27ae60; color: white; border: none; border-radius: 50px; cursor: pointer; transition: 0.3s; flex: 1; }
+        .overlay-ui { margin-top: 20px; display: flex; flex-direction: column; align-items: center; }
+        .button-group { display: flex; align-items: center; justify-content: center; gap: 15px; width: 100%; max-width: 400px; }
+        .btn { padding: 15px 30px; font-size: 1.1rem; background: #27ae60; color: white; border: none; border-radius: 50px; cursor: pointer; transition: 0.3s; flex: 1; }
         .btn:active { background: #2ecc71; transform: scale(0.95); }
         .btn:disabled { background: #7f8c8d; cursor: not-allowed; }
         canvas { display: none; }
 
-        #notice-overlay {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.85); display: none; justify-content: center; align-items: center;
-            z-index: 10000; backdrop-filter: blur(5px);
-        }
-        .notice-content { background: #333; padding: 30px; border-radius: 20px; border: 2px solid #27ae60; max-width: 80%; }
+        /* 相簿按鈕 */
+        #album-btn { width: 60px; height: 60px; background: #f39c12; border-radius: 50%; display: flex; justify-content: center; align-items: center; font-size: 1.8rem; cursor: pointer; flex-shrink: 0; box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
 
-        #album-btn {
-            width: 60px; height: 60px; background: #f39c12;
-            border-radius: 50%; display: flex; justify-content: center; align-items: center;
-            font-size: 1.8rem; box-shadow: 0 4px 10px rgba(0,0,0,0.4);
-            cursor: pointer; transition: 0.3s; flex-shrink: 0;
+        /* 相簿全螢幕視窗 */
+        #gallery-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #1a1a1a; display: none; flex-direction: column; z-index: 20000; }
+        .gallery-header { padding: 20px; display: flex; justify-content: space-between; align-items: center; background: #222; border-bottom: 2px solid #f39c12; }
+        
+        /* 核心修正：優化 Grid 排版 */
+        #gallery-content { 
+            flex: 1; overflow-y: auto; padding: 15px; 
+            display: grid; 
+            grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); 
+            gap: 12px; 
+            align-content: start; 
+            padding-bottom: 50px; /* 防止底部被遮擋 */
         }
 
-        #gallery-overlay {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: #1a1a1a; display: none; flex-direction: column;
-            z-index: 20000; animation: fadeIn 0.3s;
+        .photo-item { 
+            width: 100%; aspect-ratio: 1/1; background: #000; 
+            border-radius: 12px; overflow: hidden; border: 1px solid #444; 
+            position: relative; box-shadow: 0 4px 8px rgba(0,0,0,0.5);
         }
-        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
-        .gallery-header {
-            padding: 20px; display: flex; justify-content: space-between;
-            align-items: center; background: #222; border-bottom: 2px solid #f39c12;
+        .photo-item img { 
+            width: 100%; height: 100%; 
+            object-fit: contain; /* 修正：完整顯示辨識框，不裁切 */
         }
-        #gallery-content {
-            flex: 1; overflow-y: auto; padding: 20px;
-            display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-            gap: 15px; align-content: start;
+
+        .photo-label { 
+            position: absolute; bottom: 0; width: 100%; 
+            background: rgba(0, 0, 0, 0.7); /* 半透明黑，不完全遮擋 */
+            font-size: 0.8rem; padding: 6px 0; color: #00ff00; 
+            border-top: 1px solid rgba(255,255,255,0.1);
         }
-        .photo-item {
-            width: 100%; aspect-ratio: 1/1; background: #333;
-            border-radius: 12px; overflow: hidden; border: 2px solid #444;
-            position: relative;
-        }
-        .photo-item img { width: 100%; height: 100%; object-fit: cover; }
-        .photo-label {
-            position: absolute; bottom: 0; width: 100%; background: rgba(0,0,0,0.7);
-            font-size: 0.8rem; padding: 5px 0; color: #00ff00;
-        }
+
+        /* 叮嚀彈窗 */
+        #notice-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); display: none; justify-content: center; align-items: center; z-index: 10000; backdrop-filter: blur(5px); }
+        .notice-content { background: #333; padding: 30px; border-radius: 20px; border: 2px solid #27ae60; max-width: 85%; }
     </style>
 </head>
 <body>
@@ -77,11 +74,11 @@
 
     <div id="gallery-overlay">
         <div class="gallery-header">
-            <h2 style="margin:0; color:#f39c12;">環境守護者紀錄</h2>
-            <button class="btn" style="padding: 10px 25px; font-size: 1rem; background: #e74c3c; flex:none;" onclick="closeGallery()">關閉相簿</button>
+            <h2 style="margin:0; color:#f39c12; font-size: 1.2rem;">環境守護者紀錄</h2>
+            <button class="btn" style="padding: 8px 20px; font-size: 0.9rem; background: #e74c3c; flex:none;" onclick="closeGallery()">關閉</button>
         </div>
         <div id="gallery-content">
-            <p id="empty-msg" style="grid-column: 1/-1; color:#666; margin-top: 50px;">目前尚無紀錄，快去辨識第一件垃圾吧！</p>
+            <p id="empty-msg" style="grid-column: 1/-1; color:#666; margin-top: 50px;">目前尚無紀錄</p>
         </div>
     </div>
 
@@ -95,7 +92,7 @@
     <canvas id="canvas"></canvas>
 
     <div class="overlay-ui">
-        <p>對準垃圾後，點擊下方進行辨識：</p>
+        <p style="font-size: 0.9rem; color: #aaa;">對準垃圾後，點擊下方進行辨識：</p>
         <div class="button-group">
             <div id="album-btn" onclick="openGallery()">🖼️</div>
             <button id="captureBtn" class="btn">📷 拍照並辨識</button>
@@ -103,6 +100,7 @@
     </div>
 
     <script>
+        // Firebase 設定保持不變
         const firebaseConfig = {
             apiKey: "AIzaSyAWLI1eL8c7SGwxTd06rwRFgf0_KZrjNxY",
             authDomain: "environmentguardian-bf374.firebaseapp.com",
@@ -123,7 +121,6 @@
         const noticeOverlay = document.getElementById('notice-overlay');
         const galleryOverlay = document.getElementById('gallery-overlay');
 
-        // --- 核心改動：狀態鎖定變數 ---
         let isWaitingForThisResult = false;
 
         async function startCamera() {
@@ -134,10 +131,11 @@
                 });
                 video.srcObject = stream;
                 statusText.innerText = "相機已啟動 - 準備辨識";
+                statusText.style.color = "#00ff00";
                 setTimeout(() => { noticeOverlay.style.display = 'flex'; }, 500);
             } catch (err) {
                 statusText.innerText = "無法開啟相機: " + err.message;
-                statusText.style.color = "red";
+                statusText.style.color = "#ff4444";
             }
         }
 
@@ -147,8 +145,9 @@
 
         captureBtn.onclick = function() {
             statusText.innerText = "正在擷取影像...";
+            statusText.style.color = "#f39c12";
             captureBtn.disabled = true;
-            isWaitingForThisResult = true; // 標記我們正在等待一個結果
+            isWaitingForThisResult = true;
 
             canvas.width = video.videoWidth;
             canvas.height = video.videoHeight;
@@ -161,29 +160,22 @@
                 imgData: base64Data,
                 timestamp: Date.now()
             }).then(() => {
-                statusText.innerText = " 辨識中... ";
-                // 這裡不再呼叫 listenForResults()，因為監聽器已在頁面載入時初始化
+                statusText.innerText = "🚀 辨識中，請稍候...";
             });
         };
 
-        // --- 核心改動：監聽器現在只啟動一次 ---
         function initResultListener() {
             const resultRef = database.ref('ScanControl');
             resultRef.on('value', (snapshot) => {
                 const data = snapshot.val();
-                
-                // 只有在我們「主動要求」且 Python 端「處理完畢」時才執行
                 if (isWaitingForThisResult && data && data.isWaitingForScan === false && data.scannedResult) {
-                    
-                    isWaitingForThisResult = false; // 收到結果後立即關閉門戶
-                    
-                    statusText.innerText = " 辨識結果 ： " + data.scannedResult;
+                    isWaitingForThisResult = false;
+                    statusText.innerText = "✅ 辨識結果：" + data.scannedResult;
                     statusText.style.color = "#00ff00";
                     captureBtn.disabled = false;
 
                     if (data.resultImg) {
                         addToGallery(data.resultImg, data.scannedResult);
-                        // 清空 resultImg 避免在 Firebase 中殘留過大的 Base64 數據
                         database.ref('ScanControl/resultImg').set(null);
                     }
                 }
@@ -193,7 +185,6 @@
         function addToGallery(base64Image, label) {
             const galleryContent = document.getElementById('gallery-content');
             const emptyMsg = document.getElementById('empty-msg');
-
             if (emptyMsg) emptyMsg.remove();
 
             const photoDiv = document.createElement('div');
@@ -205,14 +196,12 @@
                 <img src="${imgSrc}" alt="辨識結果">
                 <div class="photo-label">${label}</div>
             `;
-
             galleryContent.prepend(photoDiv);
         }
 
-        // 初始化
         window.addEventListener('load', () => {
             startCamera();
-            initResultListener(); // 監聽器在此啟動，與按鈕分離
+            initResultListener();
         });
     </script>
 </body>
