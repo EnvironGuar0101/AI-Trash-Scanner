@@ -25,33 +25,34 @@
         /* 相簿按鈕 */
         #album-btn { width: 60px; height: 60px; background: #f39c12; border-radius: 50%; display: flex; justify-content: center; align-items: center; font-size: 1.8rem; cursor: pointer; flex-shrink: 0; box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
 
-        /* 相簿全螢幕視窗 */
+        /* 相簿 Overlay */
         #gallery-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #1a1a1a; display: none; flex-direction: column; z-index: 20000; }
         .gallery-header { padding: 20px; display: flex; justify-content: space-between; align-items: center; background: #222; border-bottom: 2px solid #f39c12; }
         
-        /* 核心修正：固定 2行 3列 佈局 */
+        /* --- 核心修改：3行 2列 佈局 --- */
         #gallery-content { 
             flex: 1; 
             padding: 15px; 
             display: grid; 
-            grid-template-columns: repeat(3, 1fr); 
-            grid-template-rows: repeat(2, 1fr); 
-            gap: 12px; 
+            grid-template-columns: repeat(2, 1fr); /* 2 列 */
+            grid-template-rows: repeat(3, 1fr);    /* 3 行 */
+            gap: 15px; 
             align-content: start; 
         }
 
         .photo-item { 
             width: 100%; aspect-ratio: 1/1; background: #000; 
-            border-radius: 8px; overflow: hidden; border: 1px solid #444; 
-            position: relative; 
+            border-radius: 12px; overflow: hidden; border: 1px solid #444; 
+            position: relative; box-shadow: 0 4px 10px rgba(0,0,0,0.4);
         }
 
         .photo-item img { width: 100%; height: 100%; object-fit: contain; }
 
         .photo-label { 
             position: absolute; bottom: 0; width: 100%; 
-            background: rgba(0, 0, 0, 0.7); 
-            font-size: 0.7rem; padding: 4px 0; color: #00ff00; 
+            background: rgba(0, 0, 0, 0.75); 
+            font-size: 0.85rem; padding: 8px 0; color: #00ff00; 
+            font-weight: bold;
         }
 
         /* 分頁控制欄 */
@@ -63,16 +64,15 @@
             align-items: center;
             gap: 20px;
             border-top: 1px solid #444;
+            padding-bottom: 30px; /* 預留底部空間給手機手勢條 */
         }
         .page-btn {
-            background: #f39c12;
-            color: white;
-            border: none;
-            padding: 10px 20px;
-            border-radius: 5px;
-            cursor: pointer;
+            background: #f39c12; color: white; border: none;
+            padding: 12px 25px; border-radius: 8px; cursor: pointer;
+            font-weight: bold; transition: 0.2s;
         }
-        .page-btn:disabled { background: #555; cursor: not-allowed; }
+        .page-btn:active { transform: scale(0.9); }
+        .page-btn:disabled { background: #444; color: #777; cursor: not-allowed; }
 
         /* 叮嚀彈窗 */
         #notice-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); display: none; justify-content: center; align-items: center; z-index: 10000; backdrop-filter: blur(5px); }
@@ -99,7 +99,7 @@
 
         <div class="pagination-bar">
             <button id="prevBtn" class="page-btn" onclick="changePage(-1)">上一頁</button>
-            <span id="pageInfo">第 1 頁</span>
+            <span id="pageInfo" style="font-weight: bold;">第 1 頁</span>
             <button id="nextBtn" class="page-btn" onclick="changePage(1)">下一頁</button>
         </div>
     </div>
@@ -139,13 +139,11 @@
         const canvas = document.getElementById('canvas');
         const statusText = document.getElementById('status');
         const captureBtn = document.getElementById('captureBtn');
-        const noticeOverlay = document.getElementById('notice-overlay');
         const galleryOverlay = document.getElementById('gallery-overlay');
 
-        // --- 分頁狀態變數 ---
-        let allPhotos = []; // 儲存所有照片資料
+        let allPhotos = []; 
         let currentPage = 1;
-        const itemsPerPage = 6; // 2行 x 3列
+        const itemsPerPage = 6; // 3行 x 2列 = 6張
         let isWaitingForThisResult = false;
 
         async function startCamera() {
@@ -156,24 +154,21 @@
                 });
                 video.srcObject = stream;
                 statusText.innerText = "相機已啟動 - 準備辨識";
-                statusText.style.color = "#00ff00";
-                setTimeout(() => { noticeOverlay.style.display = 'flex'; }, 500);
+                setTimeout(() => { document.getElementById('notice-overlay').style.display = 'flex'; }, 500);
             } catch (err) {
                 statusText.innerText = "無法開啟相機: " + err.message;
-                statusText.style.color = "#ff4444";
             }
         }
 
-        function closeNotice() { noticeOverlay.style.display = 'none'; }
+        function closeNotice() { document.getElementById('notice-overlay').style.display = 'none'; }
         function openGallery() { 
             galleryOverlay.style.display = 'flex'; 
-            renderGallery(); // 開啟時重新渲染
+            renderGallery(); 
         }
         function closeGallery() { galleryOverlay.style.display = 'none'; }
 
         captureBtn.onclick = function() {
             statusText.innerText = "正在擷取影像...";
-            statusText.style.color = "#f39c12";
             captureBtn.disabled = true;
             isWaitingForThisResult = true;
 
@@ -198,18 +193,16 @@
                 const data = snapshot.val();
                 if (isWaitingForThisResult && data && data.isWaitingForScan === false && data.scannedResult) {
                     isWaitingForThisResult = false;
-                    statusText.innerText = " 辨識結果： " + data.scannedResult;
-                    statusText.style.color = "#00ff00";
+                    statusText.innerText = "✅ 辨識結果：" + data.scannedResult;
                     captureBtn.disabled = false;
 
                     if (data.resultImg) {
-                        // 核心修改：存入陣列而非直接操作 DOM
                         const newPhoto = {
                             img: data.resultImg.startsWith('data:image') ? data.resultImg : 'data:image/jpeg;base64,' + data.resultImg,
                             label: data.scannedResult
                         };
-                        allPhotos.unshift(newPhoto); // 新照片放最前面
-                        currentPage = 1; // 回到第一頁看新照片
+                        allPhotos.unshift(newPhoto); 
+                        currentPage = 1; 
                         renderGallery(); 
                         database.ref('ScanControl/resultImg').set(null);
                     }
@@ -217,10 +210,9 @@
             });
         }
 
-        // --- 核心改動：渲染分頁函式 ---
         function renderGallery() {
             const container = document.getElementById('gallery-content');
-            container.innerHTML = ""; // 清空舊的
+            container.innerHTML = ""; 
 
             const start = (currentPage - 1) * itemsPerPage;
             const end = start + itemsPerPage;
@@ -232,15 +224,11 @@
                 currentItems.forEach(item => {
                     const div = document.createElement('div');
                     div.className = 'photo-item';
-                    div.innerHTML = `
-                        <img src="${item.img}">
-                        <div class="photo-label">${item.label}</div>
-                    `;
+                    div.innerHTML = `<img src="${item.img}"><div class="photo-label">${item.label}</div>`;
                     container.appendChild(div);
                 });
             }
 
-            // 更新按鈕狀態
             document.getElementById('pageInfo').innerText = `第 ${currentPage} 頁 / 共 ${Math.ceil(allPhotos.length / itemsPerPage) || 1} 頁`;
             document.getElementById('prevBtn').disabled = (currentPage === 1);
             document.getElementById('nextBtn').disabled = (end >= allPhotos.length);
