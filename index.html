@@ -10,9 +10,20 @@
         body { font-family: sans-serif; text-align: center; background: #222; color: white; margin: 0; padding: 20px; }
         #video-container { position: relative; display: inline-block; width: 100%; max-width: 500px; border: 5px solid #444; border-radius: 15px; overflow: hidden; background: #000; }
         video { width: 100%; height: auto; display: block; }
-        .overlay-ui { margin-top: 20px; }
+        .overlay-ui { margin-top: 20px; display: flex; flex-direction: column; align-items: center; }
         #status { color: #00ff00; font-weight: bold; margin: 10px 0; }
-        .btn { padding: 15px 40px; font-size: 1.2rem; background: #27ae60; color: white; border: none; border-radius: 50px; cursor: pointer; transition: 0.3s; }
+        
+        /* 按鈕容器：讓相簿與拍照按鈕並列 */
+        .button-group {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 15px; /* 按鈕之間的間距 */
+            width: 100%;
+            max-width: 400px;
+        }
+
+        .btn { padding: 15px 40px; font-size: 1.2rem; background: #27ae60; color: white; border: none; border-radius: 50px; cursor: pointer; transition: 0.3s; flex: 1; }
         .btn:active { background: #2ecc71; transform: scale(0.95); }
         .btn:disabled { background: #7f8c8d; cursor: not-allowed; }
         canvas { display: none; }
@@ -28,17 +39,16 @@
             border: 2px solid #27ae60; max-width: 80%;
         }
 
-        /* --- 新增：左下角相簿按鈕 --- */
+        /* --- 修改：相簿按鈕改為相對定位，放在按鈕群組內 --- */
         #album-btn {
-            position: fixed; bottom: 25px; left: 25px;
-            width: 65px; height: 65px; background: #f39c12;
+            width: 60px; height: 60px; background: #f39c12;
             border-radius: 50%; display: flex; justify-content: center; align-items: center;
-            font-size: 1.8rem; box-shadow: 0 4px 15px rgba(0,0,0,0.4);
-            cursor: pointer; z-index: 999; transition: 0.3s;
+            font-size: 1.8rem; box-shadow: 0 4px 10px rgba(0,0,0,0.4);
+            cursor: pointer; transition: 0.3s; flex-shrink: 0; /* 防止圓形被擠壓變形 */
         }
         #album-btn:hover { transform: scale(1.1); background: #e67e22; }
 
-        /* --- 新增：相簿全螢幕視窗 --- */
+        /* --- 相簿全螢幕視窗 --- */
         #gallery-overlay {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: #1a1a1a; display: none; flex-direction: column;
@@ -77,12 +87,10 @@
         </div>
     </div>
 
-    <div id="album-btn" onclick="openGallery()">🖼️</div>
-
     <div id="gallery-overlay">
         <div class="gallery-header">
             <h2 style="margin:0; color:#f39c12;">環境守護者紀錄</h2>
-            <button class="btn" style="padding: 10px 25px; font-size: 1rem; background: #e74c3c;" onclick="closeGallery()">關閉相簿</button>
+            <button class="btn" style="padding: 10px 25px; font-size: 1rem; background: #e74c3c; flex:none;" onclick="closeGallery()">關閉相簿</button>
         </div>
         <div id="gallery-content">
             <p id="empty-msg" style="grid-column: 1/-1; color:#666; margin-top: 50px;">目前尚無紀錄，快去辨識第一件垃圾吧！</p>
@@ -100,7 +108,11 @@
 
     <div class="overlay-ui">
         <p>對準垃圾後，點擊下方進行辨識：</p>
-        <button id="captureBtn" class="btn">📷 拍照並辨識</button>
+        
+        <div class="button-group">
+            <div id="album-btn" onclick="openGallery()">🖼️</div>
+            <button id="captureBtn" class="btn">📷 拍照並辨識</button>
+        </div>
     </div>
 
     <script>
@@ -125,7 +137,6 @@
         const noticeOverlay = document.getElementById('notice-overlay');
         const galleryOverlay = document.getElementById('gallery-overlay');
 
-        // 啟動相機
         async function startCamera() {
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ 
@@ -146,12 +157,9 @@
         }
 
         function closeNotice() { noticeOverlay.style.display = 'none'; }
-
-        // --- 相簿開啟/關閉功能 ---
         function openGallery() { galleryOverlay.style.display = 'flex'; }
         function closeGallery() { galleryOverlay.style.display = 'none'; }
 
-        // 拍照並送出
         captureBtn.onclick = function() {
             statusText.innerText = "正在擷取影像...";
             captureBtn.disabled = true;
