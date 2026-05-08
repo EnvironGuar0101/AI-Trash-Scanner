@@ -7,7 +7,7 @@
     <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-database-compat.js"></script>
     <style>
-        /* 全域樣式修正 */
+        /* 全域樣式 */
         * { box-sizing: border-box; }
         body { font-family: sans-serif; text-align: center; background: #222; color: white; margin: 0; padding: 20px; }
         
@@ -29,33 +29,50 @@
         #gallery-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #1a1a1a; display: none; flex-direction: column; z-index: 20000; }
         .gallery-header { padding: 20px; display: flex; justify-content: space-between; align-items: center; background: #222; border-bottom: 2px solid #f39c12; }
         
-        /* 核心修正：優化 Grid 排版 */
+        /* 核心修正：固定 2行 3列 佈局 */
         #gallery-content { 
-            flex: 1; overflow-y: auto; padding: 15px; 
+            flex: 1; 
+            padding: 15px; 
             display: grid; 
-            grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); 
+            grid-template-columns: repeat(3, 1fr); 
+            grid-template-rows: repeat(2, 1fr); 
             gap: 12px; 
             align-content: start; 
-            padding-bottom: 50px; /* 防止底部被遮擋 */
         }
 
         .photo-item { 
             width: 100%; aspect-ratio: 1/1; background: #000; 
-            border-radius: 12px; overflow: hidden; border: 1px solid #444; 
-            position: relative; box-shadow: 0 4px 8px rgba(0,0,0,0.5);
+            border-radius: 8px; overflow: hidden; border: 1px solid #444; 
+            position: relative; 
         }
 
-        .photo-item img { 
-            width: 100%; height: 100%; 
-            object-fit: contain; /* 修正：完整顯示辨識框，不裁切 */
-        }
+        .photo-item img { width: 100%; height: 100%; object-fit: contain; }
 
         .photo-label { 
             position: absolute; bottom: 0; width: 100%; 
-            background: rgba(0, 0, 0, 0.7); /* 半透明黑，不完全遮擋 */
-            font-size: 0.8rem; padding: 6px 0; color: #00ff00; 
-            border-top: 1px solid rgba(255,255,255,0.1);
+            background: rgba(0, 0, 0, 0.7); 
+            font-size: 0.7rem; padding: 4px 0; color: #00ff00; 
         }
+
+        /* 分頁控制欄 */
+        .pagination-bar {
+            padding: 20px;
+            background: #222;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 20px;
+            border-top: 1px solid #444;
+        }
+        .page-btn {
+            background: #f39c12;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        .page-btn:disabled { background: #555; cursor: not-allowed; }
 
         /* 叮嚀彈窗 */
         #notice-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); display: none; justify-content: center; align-items: center; z-index: 10000; backdrop-filter: blur(5px); }
@@ -77,8 +94,13 @@
             <h2 style="margin:0; color:#f39c12; font-size: 1.2rem;">環境守護者紀錄</h2>
             <button class="btn" style="padding: 8px 20px; font-size: 0.9rem; background: #e74c3c; flex:none;" onclick="closeGallery()">關閉</button>
         </div>
-        <div id="gallery-content">
-            <p id="empty-msg" style="grid-column: 1/-1; color:#666; margin-top: 50px;">目前尚無紀錄</p>
+        
+        <div id="gallery-content"></div>
+
+        <div class="pagination-bar">
+            <button id="prevBtn" class="page-btn" onclick="changePage(-1)">上一頁</button>
+            <span id="pageInfo">第 1 頁</span>
+            <button id="nextBtn" class="page-btn" onclick="changePage(1)">下一頁</button>
         </div>
     </div>
 
@@ -100,7 +122,6 @@
     </div>
 
     <script>
-        // Firebase 設定保持不變
         const firebaseConfig = {
             apiKey: "AIzaSyAWLI1eL8c7SGwxTd06rwRFgf0_KZrjNxY",
             authDomain: "environmentguardian-bf374.firebaseapp.com",
@@ -121,6 +142,10 @@
         const noticeOverlay = document.getElementById('notice-overlay');
         const galleryOverlay = document.getElementById('gallery-overlay');
 
+        // --- 分頁狀態變數 ---
+        let allPhotos = []; // 儲存所有照片資料
+        let currentPage = 1;
+        const itemsPerPage = 6; // 2行 x 3列
         let isWaitingForThisResult = false;
 
         async function startCamera() {
@@ -140,7 +165,10 @@
         }
 
         function closeNotice() { noticeOverlay.style.display = 'none'; }
-        function openGallery() { galleryOverlay.style.display = 'flex'; }
+        function openGallery() { 
+            galleryOverlay.style.display = 'flex'; 
+            renderGallery(); // 開啟時重新渲染
+        }
         function closeGallery() { galleryOverlay.style.display = 'none'; }
 
         captureBtn.onclick = function() {
@@ -170,33 +198,57 @@
                 const data = snapshot.val();
                 if (isWaitingForThisResult && data && data.isWaitingForScan === false && data.scannedResult) {
                     isWaitingForThisResult = false;
-                    statusText.innerText = "✅ 辨識結果：" + data.scannedResult;
+                    statusText.innerText = " 辨識結果： " + data.scannedResult;
                     statusText.style.color = "#00ff00";
                     captureBtn.disabled = false;
 
                     if (data.resultImg) {
-                        addToGallery(data.resultImg, data.scannedResult);
+                        // 核心修改：存入陣列而非直接操作 DOM
+                        const newPhoto = {
+                            img: data.resultImg.startsWith('data:image') ? data.resultImg : 'data:image/jpeg;base64,' + data.resultImg,
+                            label: data.scannedResult
+                        };
+                        allPhotos.unshift(newPhoto); // 新照片放最前面
+                        currentPage = 1; // 回到第一頁看新照片
+                        renderGallery(); 
                         database.ref('ScanControl/resultImg').set(null);
                     }
                 }
             });
         }
 
-        function addToGallery(base64Image, label) {
-            const galleryContent = document.getElementById('gallery-content');
-            const emptyMsg = document.getElementById('empty-msg');
-            if (emptyMsg) emptyMsg.remove();
+        // --- 核心改動：渲染分頁函式 ---
+        function renderGallery() {
+            const container = document.getElementById('gallery-content');
+            container.innerHTML = ""; // 清空舊的
 
-            const photoDiv = document.createElement('div');
-            photoDiv.className = 'photo-item';
-            
-            const imgSrc = base64Image.startsWith('data:image') ? base64Image : 'data:image/jpeg;base64,' + base64Image;
+            const start = (currentPage - 1) * itemsPerPage;
+            const end = start + itemsPerPage;
+            const currentItems = allPhotos.slice(start, end);
 
-            photoDiv.innerHTML = `
-                <img src="${imgSrc}" alt="辨識結果">
-                <div class="photo-label">${label}</div>
-            `;
-            galleryContent.prepend(photoDiv);
+            if (allPhotos.length === 0) {
+                container.innerHTML = `<p style="grid-column: 1/-1; color:#666; margin-top: 50px;">目前尚無紀錄</p>`;
+            } else {
+                currentItems.forEach(item => {
+                    const div = document.createElement('div');
+                    div.className = 'photo-item';
+                    div.innerHTML = `
+                        <img src="${item.img}">
+                        <div class="photo-label">${item.label}</div>
+                    `;
+                    container.appendChild(div);
+                });
+            }
+
+            // 更新按鈕狀態
+            document.getElementById('pageInfo').innerText = `第 ${currentPage} 頁 / 共 ${Math.ceil(allPhotos.length / itemsPerPage) || 1} 頁`;
+            document.getElementById('prevBtn').disabled = (currentPage === 1);
+            document.getElementById('nextBtn').disabled = (end >= allPhotos.length);
+        }
+
+        function changePage(step) {
+            currentPage += step;
+            renderGallery();
         }
 
         window.addEventListener('load', () => {
