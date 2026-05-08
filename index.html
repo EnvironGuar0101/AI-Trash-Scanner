@@ -13,14 +13,9 @@
         .overlay-ui { margin-top: 20px; display: flex; flex-direction: column; align-items: center; }
         #status { color: #00ff00; font-weight: bold; margin: 10px 0; }
         
-        /* 按鈕容器：讓相簿與拍照按鈕並列 */
         .button-group {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 15px; /* 按鈕之間的間距 */
-            width: 100%;
-            max-width: 400px;
+            display: flex; align-items: center; justify-content: center;
+            gap: 15px; width: 100%; max-width: 400px;
         }
 
         .btn { padding: 15px 40px; font-size: 1.2rem; background: #27ae60; color: white; border: none; border-radius: 50px; cursor: pointer; transition: 0.3s; flex: 1; }
@@ -28,27 +23,23 @@
         .btn:disabled { background: #7f8c8d; cursor: not-allowed; }
         canvas { display: none; }
 
-        /* --- 彈窗樣式 (拍攝叮嚀) --- */
+        /* 拍攝叮嚀彈窗 */
         #notice-overlay {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(0,0,0,0.85); display: none; justify-content: center; align-items: center;
             z-index: 10000; backdrop-filter: blur(5px);
         }
-        .notice-content {
-            background: #333; padding: 30px; border-radius: 20px;
-            border: 2px solid #27ae60; max-width: 80%;
-        }
+        .notice-content { background: #333; padding: 30px; border-radius: 20px; border: 2px solid #27ae60; max-width: 80%; }
 
-        /* --- 修改：相簿按鈕改為相對定位，放在按鈕群組內 --- */
+        /* 相簿按鈕 */
         #album-btn {
             width: 60px; height: 60px; background: #f39c12;
             border-radius: 50%; display: flex; justify-content: center; align-items: center;
             font-size: 1.8rem; box-shadow: 0 4px 10px rgba(0,0,0,0.4);
-            cursor: pointer; transition: 0.3s; flex-shrink: 0; /* 防止圓形被擠壓變形 */
+            cursor: pointer; transition: 0.3s; flex-shrink: 0;
         }
-        #album-btn:hover { transform: scale(1.1); background: #e67e22; }
 
-        /* --- 相簿全螢幕視窗 --- */
+        /* 相簿全螢幕視窗 */
         #gallery-overlay {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: #1a1a1a; display: none; flex-direction: column;
@@ -108,7 +99,6 @@
 
     <div class="overlay-ui">
         <p>對準垃圾後，點擊下方進行辨識：</p>
-        
         <div class="button-group">
             <div id="album-btn" onclick="openGallery()">🖼️</div>
             <button id="captureBtn" class="btn">📷 拍照並辨識</button>
@@ -116,7 +106,6 @@
     </div>
 
     <script>
-        // 1. Firebase 配置
         const firebaseConfig = {
             apiKey: "AIzaSyAWLI1eL8c7SGwxTd06rwRFgf0_KZrjNxY",
             authDomain: "environmentguardian-bf374.firebaseapp.com",
@@ -145,11 +134,7 @@
                 });
                 video.srcObject = stream;
                 statusText.innerText = "相機已啟動 - 準備辨識";
-
-                setTimeout(() => {
-                    noticeOverlay.style.display = 'flex';
-                }, 500);
-
+                setTimeout(() => { noticeOverlay.style.display = 'flex'; }, 500);
             } catch (err) {
                 statusText.innerText = "無法開啟相機: " + err.message;
                 statusText.style.color = "red";
@@ -163,40 +148,64 @@
         captureBtn.onclick = function() {
             statusText.innerText = "正在擷取影像...";
             captureBtn.disabled = true;
-
             canvas.width = video.videoWidth;
             canvas.height = video.videoHeight;
-            
             const ctx = canvas.getContext('2d');
             ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
             const base64Data = canvas.toDataURL('image/jpeg', 0.6).split(',')[1];
 
             database.ref('ScanControl').update({
                 isWaitingForScan: true,
                 imgData: base64Data,
                 timestamp: Date.now()
-            })
-            .then(() => {
-                statusText.innerText = "🚀 影像已送出，等待 3060 Ti 辨識...";
+            }).then(() => {
+                statusText.innerText = "辨識中...";
                 listenForResults();
-            })
-            .catch(e => {
-                alert("上傳失敗: " + e.message);
-                captureBtn.disabled = false;
             });
         };
 
+        // --- 新增：監聽辨識結果與回傳影像 ---
         function listenForResults() {
             const resultRef = database.ref('ScanControl');
             resultRef.on('value', (snapshot) => {
                 const data = snapshot.val();
+                
+                // 檢查 Python 端是否已經處理完畢
                 if (data && data.isWaitingForScan === false && data.scannedResult) {
                     statusText.innerText = "✅ 辨識結果：" + data.scannedResult;
                     statusText.style.color = "#00ff00";
                     captureBtn.disabled = false;
+
+                    // 如果 Python 端有回傳帶有辨識框的影像 (假設鍵名為 resultImg)
+                    if (data.resultImg) {
+                        addToGallery(data.resultImg, data.scannedResult);
+                        // 完成後清空 resultImg 防止重複觸發
+                        database.ref('ScanControl/resultImg').set(null);
+                    }
                 }
             });
+        }
+
+        // --- 新增：將影像動態渲染至相簿 ---
+        function addToGallery(base64Image, label) {
+            const galleryContent = document.getElementById('gallery-content');
+            const emptyMsg = document.getElementById('empty-msg');
+
+            if (emptyMsg) emptyMsg.remove(); // 移除「無紀錄」文字
+
+            const photoDiv = document.createElement('div');
+            photoDiv.className = 'photo-item';
+            
+            // 確保有 Base64 標頭
+            const imgSrc = base64Image.startsWith('data:image') ? base64Image : 'data:image/jpeg;base64,' + base64Image;
+
+            photoDiv.innerHTML = `
+                <img src="${imgSrc}" alt="辨識結果">
+                <div class="photo-label">${label}</div>
+            `;
+
+            // 將新紀錄放在相簿最前面
+            galleryContent.prepend(photoDiv);
         }
 
         window.addEventListener('load', startCamera);
