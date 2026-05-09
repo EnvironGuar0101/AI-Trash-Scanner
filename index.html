@@ -17,7 +17,6 @@
         
         .overlay-ui { margin-top: 20px; display: flex; flex-direction: column; align-items: center; }
         
-        /* --- 調整後的按鈕群組佈局 --- */
         .button-group { 
             display: flex; 
             align-items: center; 
@@ -27,7 +26,6 @@
             max-width: 450px; 
         }
 
-        /* 拍照按鈕改小 */
         .btn-capture { 
             padding: 12px 20px; 
             font-size: 1rem; 
@@ -36,13 +34,12 @@
             border: none; 
             border-radius: 50px; 
             cursor: pointer; 
-            flex: 1; /* 讓它自動填滿中間剩餘空間 */
+            flex: 1; 
             transition: 0.3s;
         }
         .btn-capture:active { background: #2ecc71; transform: scale(0.95); }
         .btn-capture:disabled { background: #7f8c8d; cursor: not-allowed; }
 
-        /* 相簿與結算按鈕：統一圓形樣式 */
         #album-btn, #settle-btn { 
             width: 60px; height: 60px; 
             border-radius: 50%; 
@@ -57,9 +54,26 @@
             border: none;
         }
         #album-btn { background: #f39c12; }
-        #settle-btn { background: #2980b9; color: white; } /* 結算按鈕為藍色 */
+        #settle-btn { background: #2980b9; color: white; }
         
         #album-btn:active, #settle-btn:active { transform: scale(0.9); }
+
+        /* --- 新增：圖片放大燈箱樣式 --- */
+        #lightbox-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.95);
+            display: none; /* 預設隱藏 */
+            justify-content: center; align-items: center;
+            z-index: 50000; /* 層級最高 */
+            cursor: zoom-out;
+        }
+        #lightbox-img {
+            max-width: 95%;
+            max-height: 85%;
+            border-radius: 10px;
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+            object-fit: contain;
+        }
 
         /* 結算畫面 Overlay */
         #settle-overlay { 
@@ -80,15 +94,19 @@
         .btn-s-cancel { background: #e74c3c; flex: 1; padding: 12px; border-radius: 10px; color: white; border: none; cursor: pointer; }
         .btn-s-confirm { background: #27ae60; flex: 1; padding: 12px; border-radius: 10px; color: white; border: none; cursor: pointer; font-weight: bold; }
 
-        /* 其他原有樣式保留 */
+        /* 相簿 Overlay */
         #gallery-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #1a1a1a; display: none; flex-direction: column; z-index: 20000; }
         .gallery-header { padding: 20px; display: flex; justify-content: space-between; align-items: center; background: #222; border-bottom: 2px solid #f39c12; }
         #gallery-content { flex: 1; padding: 15px; display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; align-content: start; }
-        .photo-item { width: 100%; aspect-ratio: 1/1; background: #000; border-radius: 12px; overflow: hidden; border: 1px solid #444; position: relative; }
+        
+        /* 增加 cursor: zoom-in 提示使用者可以點擊放大 */
+        .photo-item { width: 100%; aspect-ratio: 1/1; background: #000; border-radius: 12px; overflow: hidden; border: 1px solid #444; position: relative; cursor: zoom-in; }
         .photo-item img { width: 100%; height: 100%; object-fit: contain; }
         .photo-label { position: absolute; bottom: 0; width: 100%; background: rgba(0, 0, 0, 0.75); font-size: 0.85rem; padding: 8px 0; color: #00ff00; font-weight: bold; }
+        
         .pagination-bar { padding: 20px; background: #222; display: flex; justify-content: center; align-items: center; gap: 20px; border-top: 1px solid #444; padding-bottom: 30px; }
         .page-btn { background: #f39c12; color: white; border: none; padding: 12px 25px; border-radius: 8px; cursor: pointer; font-weight: bold; }
+        
         #notice-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); display: none; justify-content: center; align-items: center; z-index: 10000; backdrop-filter: blur(5px); }
         .notice-content { background: #333; padding: 30px; border-radius: 20px; border: 2px solid #27ae60; max-width: 85%; }
         canvas { display: none; }
@@ -96,13 +114,17 @@
 </head>
 <body>
 
+    <!-- 圖片放大燈箱 (Lightbox) -->
+    <div id="lightbox-overlay" onclick="closeLightbox()">
+        <img id="lightbox-img" src="" alt="放大圖片">
+        <p style="position: absolute; bottom: 20px; color: #888;">再按一下返回</p>
+    </div>
+
     <!-- 結算 Overlay -->
     <div id="settle-overlay">
         <div class="settle-box">
             <div class="settle-title">📊 任務結算</div>
-            <div id="settle-stats" class="settle-info">
-                <!-- 這裡會動態顯示統計 -->
-            </div>
+            <div id="settle-stats" class="settle-info"></div>
             <div id="settle-total-count" class="settle-total"></div>
             <div class="settle-footer">
                 <button class="btn-s-cancel" onclick="closeSettlement()">取消結算</button>
@@ -111,7 +133,6 @@
         </div>
     </div>
 
-    <!-- 原有 Overlay 保留 -->
     <div id="notice-overlay">
         <div class="notice-content">
             <h3>🌟 拍攝叮嚀</h3>
@@ -147,13 +168,11 @@
         <div class="button-group">
             <div id="album-btn" onclick="openGallery()">🖼️</div>
             <button id="captureBtn" class="btn-capture">📷 拍照並辨識</button>
-            <!-- 新增圓形結算按鈕 -->
             <button id="settle-btn" onclick="showSettlement()">📋</button>
         </div>
     </div>
 
     <script>
-        // --- Firebase 配置與變數 (保留) ---
         const firebaseConfig = {
             apiKey: "AIzaSyAWLI1eL8c7SGwxTd06rwRFgf0_KZrjNxY",
             authDomain: "environmentguardian-bf374.firebaseapp.com",
@@ -178,23 +197,29 @@
         const itemsPerPage = 6;
         let isWaitingForThisResult = false;
 
-        // --- 結算功能邏輯 ---
+        // --- 新增：放大圖片相關函式 ---
+        function openLightbox(imgSrc) {
+            const lightbox = document.getElementById('lightbox-overlay');
+            const lightboxImg = document.getElementById('lightbox-img');
+            lightboxImg.src = imgSrc;
+            lightbox.style.display = 'flex';
+        }
+
+        function closeLightbox() {
+            document.getElementById('lightbox-overlay').style.display = 'none';
+        }
+
+        // --- 結算與原有邏輯 (保持不變) ---
         function showSettlement() {
             const statsContainer = document.getElementById('settle-stats');
             const totalContainer = document.getElementById('settle-total-count');
             statsContainer.innerHTML = "";
-            
             if (allPhotos.length === 0) {
                 statsContainer.innerHTML = "<p style='text-align:center;'>目前尚未拍攝任何照片。</p>";
                 totalContainer.innerText = "總計：0 張";
             } else {
-                // 1. 統計各類別數量
                 const counts = {};
-                allPhotos.forEach(p => {
-                    counts[p.label] = (counts[p.label] || 0) + 1;
-                });
-
-                // 2. 顯示標籤統計
+                allPhotos.forEach(p => { counts[p.label] = (counts[p.label] || 0) + 1; });
                 for (const label in counts) {
                     statsContainer.innerHTML += `<div>🔹 ${label}: <b>${counts[label]}</b> 張</div>`;
                 }
@@ -203,39 +228,19 @@
             document.getElementById('settle-overlay').style.display = 'flex';
         }
 
-        function closeSettlement() {
-            document.getElementById('settle-overlay').style.display = 'none';
-        }
+        function closeSettlement() { document.getElementById('settle-overlay').style.display = 'none'; }
 
         function confirmSettlement() {
-            // 準備傳回 Unity 的資料
-            const resultData = {
-                totalPhotos: allPhotos.length,
-                photoDetails: allPhotos // 包含每張照片的 Base64 與標籤
-            };
-
+            const resultData = { totalPhotos: allPhotos.length, photoDetails: allPhotos };
             const jsonString = JSON.stringify(resultData);
-
-            // 通訊邏輯：試圖傳送給 Unity
             try {
-                if (window.parent && window.parent.Unity) {
-                    window.parent.Unity.call(jsonString); 
-                } else if (typeof Unity !== 'undefined') {
-                    // 假設 Unity 腳本物件名為 GameManager，方法名為 OnRecognitionFinished
-                    Unity.SendMessage("GameManager", "OnRecognitionFinished", jsonString);
-                } else {
-                    console.log("資料已準備 (非 Unity 環境):", resultData);
-                }
-            } catch (e) {
-                console.error("傳送到 Unity 失敗", e);
-            }
-
-            // 關閉網頁
+                if (window.parent && window.parent.Unity) { window.parent.Unity.call(jsonString); } 
+                else if (typeof Unity !== 'undefined') { Unity.SendMessage("GameManager", "OnRecognitionFinished", jsonString); }
+            } catch (e) { console.error(e); }
             alert("結算成功！即將關閉頁面。");
             window.close();
         }
 
-        // --- 原有功能函數保留 ---
         async function startCamera() {
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ 
@@ -245,9 +250,7 @@
                 video.srcObject = stream;
                 statusText.innerText = "相機已啟動 - 準備辨識";
                 setTimeout(() => { document.getElementById('notice-overlay').style.display = 'flex'; }, 500);
-            } catch (err) {
-                statusText.innerText = "無法開啟相機: " + err.message;
-            }
+            } catch (err) { statusText.innerText = "無法開啟相機: " + err.message; }
         }
 
         function closeNotice() { document.getElementById('notice-overlay').style.display = 'none'; }
@@ -278,7 +281,6 @@
                             label: data.scannedResult
                         };
                         allPhotos.unshift(newPhoto); 
-                        currentPage = 1; 
                         renderGallery(); 
                         database.ref('ScanControl/resultImg').set(null);
                     }
@@ -286,6 +288,7 @@
             });
         }
 
+        // --- 核心修改：在渲染相簿時加入點擊放大功能 ---
         function renderGallery() {
             const container = document.getElementById('gallery-content');
             container.innerHTML = ""; 
@@ -297,6 +300,8 @@
                 currentItems.forEach(item => {
                     const div = document.createElement('div');
                     div.className = 'photo-item';
+                    // 加入 onclick 觸發 openLightbox
+                    div.onclick = function() { openLightbox(item.img); };
                     div.innerHTML = `<img src="${item.img}"><div class="photo-label">${item.label}</div>`;
                     container.appendChild(div);
                 });
