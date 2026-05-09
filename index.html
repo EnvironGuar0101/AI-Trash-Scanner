@@ -58,13 +58,13 @@
         
         #album-btn:active, #settle-btn:active { transform: scale(0.9); }
 
-        /* --- 新增：圖片放大燈箱樣式 --- */
+        /* --- 圖片放大燈箱樣式 --- */
         #lightbox-overlay {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(0,0,0,0.95);
-            display: none; /* 預設隱藏 */
+            display: none; 
             justify-content: center; align-items: center;
-            z-index: 50000; /* 層級最高 */
+            z-index: 50000; 
             cursor: zoom-out;
         }
         #lightbox-img {
@@ -99,13 +99,30 @@
         .gallery-header { padding: 20px; display: flex; justify-content: space-between; align-items: center; background: #222; border-bottom: 2px solid #f39c12; }
         #gallery-content { flex: 1; padding: 15px; display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; align-content: start; }
         
-        /* 增加 cursor: zoom-in 提示使用者可以點擊放大 */
         .photo-item { width: 100%; aspect-ratio: 1/1; background: #000; border-radius: 12px; overflow: hidden; border: 1px solid #444; position: relative; cursor: zoom-in; }
         .photo-item img { width: 100%; height: 100%; object-fit: contain; }
         .photo-label { position: absolute; bottom: 0; width: 100%; background: rgba(0, 0, 0, 0.75); font-size: 0.85rem; padding: 8px 0; color: #00ff00; font-weight: bold; }
         
         .pagination-bar { padding: 20px; background: #222; display: flex; justify-content: center; align-items: center; gap: 20px; border-top: 1px solid #444; padding-bottom: 30px; }
-        .page-btn { background: #f39c12; color: white; border: none; padding: 12px 25px; border-radius: 8px; cursor: pointer; font-weight: bold; }
+        
+        /* --- 修正：分頁按鈕基礎樣式與禁用樣式 --- */
+        .page-btn { 
+            background: #f39c12; 
+            color: white; 
+            border: none; 
+            padding: 12px 25px; 
+            border-radius: 8px; 
+            cursor: pointer; 
+            font-weight: bold; 
+        }
+        
+        /* 核心修正：當按鈕被 disabled 時顯示為暗灰色 */
+        .page-btn:disabled {
+            background: #444 !important; /* 暗灰色 */
+            color: #888 !important;     /* 灰色文字 */
+            cursor: not-allowed;
+            opacity: 1;                 /* 確保不會因為其他設置變透明 */
+        }
         
         #notice-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); display: none; justify-content: center; align-items: center; z-index: 10000; backdrop-filter: blur(5px); }
         .notice-content { background: #333; padding: 30px; border-radius: 20px; border: 2px solid #27ae60; max-width: 85%; }
@@ -197,7 +214,6 @@
         const itemsPerPage = 6;
         let isWaitingForThisResult = false;
 
-        // --- 新增：放大圖片相關函式 ---
         function openLightbox(imgSrc) {
             const lightbox = document.getElementById('lightbox-overlay');
             const lightboxImg = document.getElementById('lightbox-img');
@@ -209,7 +225,6 @@
             document.getElementById('lightbox-overlay').style.display = 'none';
         }
 
-        // --- 結算與原有邏輯 (保持不變) ---
         function showSettlement() {
             const statsContainer = document.getElementById('settle-stats');
             const totalContainer = document.getElementById('settle-total-count');
@@ -288,27 +303,30 @@
             });
         }
 
-        // --- 核心修改：在渲染相簿時加入點擊放大功能 ---
         function renderGallery() {
             const container = document.getElementById('gallery-content');
             container.innerHTML = ""; 
             const start = (currentPage - 1) * itemsPerPage;
             const currentItems = allPhotos.slice(start, start + itemsPerPage);
+            
             if (allPhotos.length === 0) {
                 container.innerHTML = `<p style="grid-column: 1/-1; color:#666; margin-top: 50px;">目前尚無紀錄</p>`;
             } else {
                 currentItems.forEach(item => {
                     const div = document.createElement('div');
                     div.className = 'photo-item';
-                    // 加入 onclick 觸發 openLightbox
                     div.onclick = function() { openLightbox(item.img); };
                     div.innerHTML = `<img src="${item.img}"><div class="photo-label">${item.label}</div>`;
                     container.appendChild(div);
                 });
             }
-            document.getElementById('pageInfo').innerText = `第 ${currentPage} 頁 / 共 ${Math.ceil(allPhotos.length / itemsPerPage) || 1} 頁`;
+            
+            const totalPages = Math.ceil(allPhotos.length / itemsPerPage) || 1;
+            document.getElementById('pageInfo').innerText = `第 ${currentPage} 頁 / 共 ${totalPages} 頁`;
+            
+            // 邏輯控制：設定按鈕的 disabled 屬性
             document.getElementById('prevBtn').disabled = (currentPage === 1);
-            document.getElementById('nextBtn').disabled = (start + itemsPerPage >= allPhotos.length);
+            document.getElementById('nextBtn').disabled = (currentPage >= totalPages);
         }
 
         function changePage(step) { currentPage += step; renderGallery(); }
