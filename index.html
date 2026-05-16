@@ -131,13 +131,11 @@
 </head>
 <body>
 
-    <!-- 圖片放大燈箱 (Lightbox) -->
     <div id="lightbox-overlay" onclick="closeLightbox()">
         <img id="lightbox-img" src="" alt="放大圖片">
         <p style="position: absolute; bottom: 20px; color: #888;">再按一下返回</p>
     </div>
 
-    <!-- 結算 Overlay -->
     <div id="settle-overlay">
         <div class="settle-box">
             <div class="settle-title">📊 任務結算</div>
@@ -245,13 +243,30 @@
 
         function closeSettlement() { document.getElementById('settle-overlay').style.display = 'none'; }
 
+        // ==========================================
+        // ★ 核心修改：點擊確認結算時，統計類別並回傳 Firebase
+        // ==========================================
         function confirmSettlement() {
-            const resultData = { totalPhotos: allPhotos.length, photoDetails: allPhotos };
+            // 1. 計算每個垃圾類別各拍了幾張
+            const counts = {};
+            allPhotos.forEach(p => { 
+                counts[p.label] = (counts[p.label] || 0) + 1; 
+            });
+
+            // 2. 將統計結果寫入 Firebase，讓 Unity 電腦端可以讀取到種類與數量
+            database.ref('ScanControl/categoryCounts').set(counts);
+
+            // 3. 將核心 flag 設為 true，通知 Unity 手機端已經完成結算
+            database.ref('isScanned').set(true);
+
+            // 以下保留你原本的 Local 傳遞邏輯與關閉視窗代碼
+            const resultData = { totalPhotos: allPhotos.length, photoDetails: allPhotos, categoryCounts: counts };
             const jsonString = JSON.stringify(resultData);
             try {
                 if (window.parent && window.parent.Unity) { window.parent.Unity.call(jsonString); } 
                 else if (typeof Unity !== 'undefined') { Unity.SendMessage("GameManager", "OnRecognitionFinished", jsonString); }
             } catch (e) { console.error(e); }
+            
             alert("結算成功！即將關閉頁面。");
             window.close();
         }
@@ -273,7 +288,7 @@
         function closeGallery() { galleryOverlay.style.display = 'none'; }
 
         captureBtn.onclick = function() {
-            statusText.innerText = "正在擷取影像...";
+            statusText.innerText = "正在辨識...";
             captureBtn.disabled = true;
             isWaitingForThisResult = true;
             canvas.width = video.videoWidth;
