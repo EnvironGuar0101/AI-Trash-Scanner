@@ -58,6 +58,15 @@
         
         #album-btn:active, #settle-btn:active { transform: scale(0.9); }
 
+        /* =================================================== */
+        /* ★【新增】：結算按鈕禁用時的灰色樣式 (跟拍照按鈕一致) */
+        /* =================================================== */
+        #settle-btn:disabled {
+            background: #7f8c8d !important;
+            cursor: not-allowed;
+            transform: none !important; /* 禁用時取消點擊縮放效果 */
+        }
+
         /* --- 圖片放大燈箱樣式 --- */
         #lightbox-overlay {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
@@ -213,6 +222,7 @@
         const canvas = document.getElementById('canvas');
         const statusText = document.getElementById('status');
         const captureBtn = document.getElementById('captureBtn');
+        const settleBtn = document.getElementById('settle-btn'); // 宣告結算按鈕變數
         const galleryOverlay = document.getElementById('gallery-overlay');
 
         let allPhotos = []; 
@@ -304,6 +314,7 @@
         captureBtn.onclick = function() {
             statusText.innerText = "正在辨識...";
             captureBtn.disabled = true;
+            settleBtn.disabled = true; // ★【修改】：按下瞬間立刻將結算按鈕禁用變灰，提供即時 UX 反饋
             isWaitingForThisResult = true;
             canvas.width = video.videoWidth;
             canvas.height = video.videoHeight;
@@ -318,6 +329,12 @@
             // 【路徑更新】手機端只針對自己房間底下的結果進行動態監聽
             database.ref(`Players/${playerId}/ScanControl`).on('value', (snapshot) => {
                 const data = snapshot.val();
+                
+                // ★【核心修改】：根據 Firebase 的狀態動態鎖定或釋放結算按鈕 (防呆機制)
+                if (data) {
+                    settleBtn.disabled = (data.isWaitingForScan === true);
+                }
+
                 if (isWaitingForThisResult && data && data.isWaitingForScan === false && data.scannedResult) {
                     isWaitingForThisResult = false;
                     statusText.innerText = "✅ 辨識結果：" + data.scannedResult;
