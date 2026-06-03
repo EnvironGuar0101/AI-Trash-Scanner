@@ -201,6 +201,14 @@
         firebase.initializeApp(firebaseConfig);
         const database = firebase.database();
 
+        // ===================================================
+        // ★【核心升級：抓取網址參數裏的唯一 Player ID 房號】
+        // ===================================================
+        const urlParams = new URLSearchParams(window.location.search);
+        const playerId = urlParams.get('id') || "default_room"; 
+        console.log("[房號綁定] 目前手機對接的 Unity 房間識別碼為:", playerId);
+        // ===================================================
+
         const video = document.getElementById('webcam');
         const canvas = document.getElementById('canvas');
         const statusText = document.getElementById('status');
@@ -243,9 +251,6 @@
 
         function closeSettlement() { document.getElementById('settle-overlay').style.display = 'none'; }
 
-        // ==========================================
-        // ★ 核心修改：點擊確認結算時，統計類別並回傳 Firebase
-        // ==========================================
         function confirmSettlement() {
             // 1. 計算每個垃圾類別各拍了幾張
             const counts = {};
@@ -253,13 +258,13 @@
                 counts[p.label] = (counts[p.label] || 0) + 1; 
             });
 
-            // 2. 將統計結果寫入 Firebase，讓 Unity 電腦端可以讀取到種類與數量
-            database.ref('ScanControl/categoryCounts').set(counts);
+            // 2. 【路徑更新】將統計結果精準寫入自己的房間資料夾裡
+            database.ref(`Players/${playerId}/ScanControl/categoryCounts`).set(counts);
 
-            // 3. 將核心 flag 設為 true，通知 Unity 手機端已經完成結算
-            database.ref('isScanned').set(true);
+            // 3. 【路徑更新】將結算狀態設為 true，通知指定的 Unity 本機端
+            database.ref(`Players/${playerId}/isScanned`).set(true);
 
-            // 以下保留你原本的 Local 傳遞邏輯與關閉視窗代碼
+            // 以下保留原本的 Local 傳遞邏輯與關閉視窗代碼
             const resultData = { totalPhotos: allPhotos.length, photoDetails: allPhotos, categoryCounts: counts };
             const jsonString = JSON.stringify(resultData);
             try {
@@ -278,7 +283,16 @@
                     audio: false 
                 });
                 video.srcObject = stream;
-                statusText.innerText = "相機已啟動 - 準備辨識";
+                
+                // 增加防呆顯示，讓你們測試時在手機上一眼就能確認是否成功連入房號
+                if(playerId === "default_room") {
+                    statusText.innerHTML = "⚠️ 相機已開啟，但未帶入專屬房號";
+                    statusText.style.color = "#ff4444";
+                } else {
+                    statusText.innerText = "相機已啟動 - 成功對接專屬房間";
+                    statusText.style.color = "#00ff00";
+                }
+                
                 setTimeout(() => { document.getElementById('notice-overlay').style.display = 'flex'; }, 500);
             } catch (err) { statusText.innerText = "無法開啟相機: " + err.message; }
         }
@@ -295,11 +309,14 @@
             canvas.height = video.videoHeight;
             canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
             const base64Data = canvas.toDataURL('image/jpeg', 0.6).split(',')[1];
-            database.ref('ScanControl').update({ isWaitingForScan: true, imgData: base64Data, timestamp: Date.now() });
+            
+            // 【路徑更新】將上傳的照片與等待通知精準寫入特定的玩家房間裡
+            database.ref(`Players/${playerId}/ScanControl`).update({ isWaitingForScan: true, imgData: base64Data, timestamp: Date.now() });
         };
 
         function initResultListener() {
-            database.ref('ScanControl').on('value', (snapshot) => {
+            // 【路徑更新】手機端只針對自己房間底下的結果進行動態監聽
+            database.ref(`Players/${playerId}/ScanControl`).on('value', (snapshot) => {
                 const data = snapshot.val();
                 if (isWaitingForThisResult && data && data.isWaitingForScan === false && data.scannedResult) {
                     isWaitingForThisResult = false;
@@ -312,7 +329,9 @@
                         };
                         allPhotos.unshift(newPhoto); 
                         renderGallery(); 
-                        database.ref('ScanControl/resultImg').set(null);
+                        
+                        // 【路徑更新】清除單次辨識完成後的暫存底圖
+                        database.ref(`Players/${playerId}/ScanControl/resultImg`).set(null);
                     }
                 }
             });
@@ -339,7 +358,6 @@
             const totalPages = Math.ceil(allPhotos.length / itemsPerPage) || 1;
             document.getElementById('pageInfo').innerText = `第 ${currentPage} 頁 / 共 ${totalPages} 頁`;
             
-            // 邏輯控制：設定按鈕的 disabled 屬性
             document.getElementById('prevBtn').disabled = (currentPage === 1);
             document.getElementById('nextBtn').disabled = (currentPage >= totalPages);
         }
