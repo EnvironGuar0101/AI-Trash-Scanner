@@ -116,20 +116,21 @@
         .btn-s-confirm { background: #27ae60; flex: 1; padding: 12px; border-radius: 10px; color: white; border: none; cursor: pointer; font-weight: bold; }
 
         /* =================================================== */
-        /* ★【相簿介面最佳化】：縮小圖片並防擠壓 */
+        /* ★【相簿介面終極最佳化】：全面縮小圖片 + 提升防擋按鈕 */
         /* =================================================== */
         #gallery-overlay { 
             position: fixed; 
             top: 0; left: 0; 
             width: 100%; 
-            height: 100dvh;       /* 使用 dvh 確保動態適應手機瀏覽器高度 */
+            height: 100dvh;       
             background: #1a1a1a; 
             display: none; 
             flex-direction: column; 
             z-index: 20000; 
+            overflow: hidden;    /* 強制阻斷外部拉伸，確保按紐鎖定在螢幕內 */
         }
         .gallery-header { 
-            padding: 15px 20px; 
+            padding: 12px 20px; 
             display: flex; 
             justify-content: space-between; 
             align-items: center; 
@@ -138,20 +139,20 @@
         }
         #gallery-content { 
             flex: 1; 
-            padding: 12px; 
+            padding: 10px; 
             display: grid; 
-            grid-template-columns: repeat(3, 1fr); /* 改成 3 欄排列，圖片自動變小 */
-            gap: 10px;                            /* 縮小間距 */
+            grid-template-columns: repeat(3, 1fr); /* 核心修改：改為 3 欄，圖片會大幅縮小 */
+            gap: 8px;                             /* 縮減間距省空間 */
             align-content: start; 
-            overflow-y: auto;                      /* 關鍵：超出範圍時在內部滾動，不推擠按鈕 */
-            -webkit-overflow-scrolling: touch;     /* 優化 iOS 滾動流暢度 */
+            overflow-y: auto;                      /* 超出範圍時在此區域內滾動 */
+            -webkit-overflow-scrolling: touch;     
         }
         
         .photo-item { 
             width: 100%; 
             aspect-ratio: 1 / 1; 
             background: #000; 
-            border-radius: 10px; 
+            border-radius: 8px; 
             overflow: hidden; 
             border: 1px solid #444; 
             position: relative; 
@@ -162,22 +163,23 @@
             position: absolute; 
             bottom: 0; 
             width: 100%; 
-            background: rgba(0, 0, 0, 0.75); 
-            font-size: 0.75rem; /* 微調字體大小配合微縮圖 */
-            padding: 4px 0; 
+            background: rgba(0, 0, 0, 0.8); 
+            font-size: 0.7rem;   /* 字體縮小配合精緻小圖 */
+            padding: 3px 0; 
             color: #00ff00; 
             font-weight: bold; 
         }
         
         .pagination-bar { 
-            padding: 15px; 
+            padding: 12px; 
             background: #222; 
             display: flex; 
             justify-content: center; 
             align-items: center; 
-            gap: 20px; 
+            gap: 15px; 
             border-top: 1px solid #444; 
-            padding-bottom: calc(15px + env(safe-area-inset-bottom)); /* 預留手機底部安全區域 */
+            /* 終極安全防禦：額外增加底部內縮邊距，把按鈕頂上去，避開 Safari 瀏覽器白條 */
+            padding-bottom: calc(30px + env(safe-area-inset-bottom)); 
         }
         /* =================================================== */
         
@@ -185,10 +187,11 @@
             background: #f39c12; 
             color: white; 
             border: none; 
-            padding: 10px 22px; 
+            padding: 8px 20px; 
             border-radius: 8px; 
             cursor: pointer; 
             font-weight: bold; 
+            font-size: 0.9rem;
         }
         .page-btn:disabled {
             background: #444 !important; 
@@ -237,7 +240,7 @@
         <div id="gallery-content"></div>
         <div class="pagination-bar">
             <button id="prevBtn" class="page-btn" onclick="changePage(-1)">上一頁</button>
-            <span id="pageInfo" style="font-weight: bold;">第 1 頁</span>
+            <span id="pageInfo" style="font-weight: bold; font-size: 0.9rem;">第 1 頁</span>
             <button id="nextBtn" class="page-btn" onclick="changePage(1)">下一頁</button>
         </div>
     </div>
@@ -287,7 +290,7 @@
 
         let allPhotos = []; 
         let currentPage = 1;
-        const itemsPerPage = 6; // 3欄架構下，一頁 6 張剛好形成完美的 3x2 排列
+        const itemsPerPage = 6; // 3欄小圖下，一頁 6 張剛好排滿 3x2 的黃金比例
         let isWaitingForThisResult = false;
 
         function openLightbox(imgSrc) {
