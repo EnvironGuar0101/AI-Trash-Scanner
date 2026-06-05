@@ -2,7 +2,7 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>環境守護者 - AI 拍照辨識</title>
     <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-database-compat.js"></script>
@@ -11,15 +11,13 @@
         * { box-sizing: border-box; }
         body { font-family: sans-serif; text-align: center; background: #222; color: white; margin: 0; padding: 20px; }
         
-        /* =================================================== */
-        /* ★【畫面同步修正】：將相機外框與視訊全部強制鎖定為 1:1 正方形 */
-        /* =================================================== */
+        /* 畫面同步修正：將相機外框與視訊全部強制鎖定為 1:1 正方形 */
         #video-container { 
             position: relative; 
             display: inline-block; 
             width: 100%; 
-            max-width: 400px;      /* 調整最大寬度，讓正方形在手機上更精緻 */
-            aspect-ratio: 1 / 1;  /* 強制外框變成 1:1 正方形 */
+            max-width: 400px;      
+            aspect-ratio: 1 / 1;  
             border: 5px solid #444; 
             border-radius: 15px; 
             overflow: hidden; 
@@ -28,10 +26,9 @@
         video { 
             width: 100%; 
             height: 100%; 
-            object-fit: cover;    /* 核心：讓網頁視訊自動中央裁切，與拍攝結果 100% 一致！ */
+            object-fit: cover;    
             display: block; 
         }
-        /* =================================================== */
         
         #status { color: #00ff00; font-weight: bold; margin: 10px 0; min-height: 1.2em; }
         .overlay-ui { margin-top: 20px; display: flex; flex-direction: column; align-items: center; }
@@ -118,22 +115,77 @@
         .btn-s-cancel { background: #e74c3c; flex: 1; padding: 12px; border-radius: 10px; color: white; border: none; cursor: pointer; }
         .btn-s-confirm { background: #27ae60; flex: 1; padding: 12px; border-radius: 10px; color: white; border: none; cursor: pointer; font-weight: bold; }
 
-        /* 相簿 Overlay */
-        #gallery-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #1a1a1a; display: none; flex-direction: column; z-index: 20000; }
-        .gallery-header { padding: 20px; display: flex; justify-content: space-between; align-items: center; background: #222; border-bottom: 2px solid #f39c12; }
-        #gallery-content { flex: 1; padding: 15px; display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; align-content: start; }
+        /* =================================================== */
+        /* ★【相簿介面最佳化】：縮小圖片並防擠壓 */
+        /* =================================================== */
+        #gallery-overlay { 
+            position: fixed; 
+            top: 0; left: 0; 
+            width: 100%; 
+            height: 100dvh;       /* 使用 dvh 確保動態適應手機瀏覽器高度 */
+            background: #1a1a1a; 
+            display: none; 
+            flex-direction: column; 
+            z-index: 20000; 
+        }
+        .gallery-header { 
+            padding: 15px 20px; 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+            background: #222; 
+            border-bottom: 2px solid #f39c12; 
+        }
+        #gallery-content { 
+            flex: 1; 
+            padding: 12px; 
+            display: grid; 
+            grid-template-columns: repeat(3, 1fr); /* 改成 3 欄排列，圖片自動變小 */
+            gap: 10px;                            /* 縮小間距 */
+            align-content: start; 
+            overflow-y: auto;                      /* 關鍵：超出範圍時在內部滾動，不推擠按鈕 */
+            -webkit-overflow-scrolling: touch;     /* 優化 iOS 滾動流暢度 */
+        }
         
-        .photo-item { width: 100%; aspect-ratio: 1/1; background: #000; border-radius: 12px; overflow: hidden; border: 1px solid #444; position: relative; cursor: zoom-in; }
+        .photo-item { 
+            width: 100%; 
+            aspect-ratio: 1 / 1; 
+            background: #000; 
+            border-radius: 10px; 
+            overflow: hidden; 
+            border: 1px solid #444; 
+            position: relative; 
+            cursor: zoom-in; 
+        }
         .photo-item img { width: 100%; height: 100%; object-fit: contain; }
-        .photo-label { position: absolute; bottom: 0; width: 100%; background: rgba(0, 0, 0, 0.75); font-size: 0.85rem; padding: 8px 0; color: #00ff00; font-weight: bold; }
+        .photo-label { 
+            position: absolute; 
+            bottom: 0; 
+            width: 100%; 
+            background: rgba(0, 0, 0, 0.75); 
+            font-size: 0.75rem; /* 微調字體大小配合微縮圖 */
+            padding: 4px 0; 
+            color: #00ff00; 
+            font-weight: bold; 
+        }
         
-        .pagination-bar { padding: 20px; background: #222; display: flex; justify-content: center; align-items: center; gap: 20px; border-top: 1px solid #444; padding-bottom: 30px; }
+        .pagination-bar { 
+            padding: 15px; 
+            background: #222; 
+            display: flex; 
+            justify-content: center; 
+            align-items: center; 
+            gap: 20px; 
+            border-top: 1px solid #444; 
+            padding-bottom: calc(15px + env(safe-area-inset-bottom)); /* 預留手機底部安全區域 */
+        }
+        /* =================================================== */
         
         .page-btn { 
             background: #f39c12; 
             color: white; 
             border: none; 
-            padding: 12px 25px; 
+            padding: 10px 22px; 
             border-radius: 8px; 
             cursor: pointer; 
             font-weight: bold; 
@@ -235,7 +287,7 @@
 
         let allPhotos = []; 
         let currentPage = 1;
-        const itemsPerPage = 6;
+        const itemsPerPage = 6; // 3欄架構下，一頁 6 張剛好形成完美的 3x2 排列
         let isWaitingForThisResult = false;
 
         function openLightbox(imgSrc) {
@@ -288,7 +340,6 @@
 
         async function startCamera() {
             try {
-                // 優化相機獲取參數
                 const stream = await navigator.mediaDevices.getUserMedia({ 
                     video: { facingMode: "environment", width: { ideal: 640 }, height: { ideal: 640 } }, 
                     audio: false 
@@ -328,7 +379,6 @@
             const sx = (vWidth - minSize) / 2;
             const sy = (vHeight - minSize) / 2;
             
-            // 裁切正中央區塊縮放到 640x640（這部分與 CSS 的 object-fit: cover 裁剪範圍完美契合！）
             ctx.drawImage(video, sx, sy, minSize, minSize, 0, 0, 640, 640);
             
             const base64Data = canvas.toDataURL('image/jpeg', 0.6).split(',')[1];
