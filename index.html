@@ -116,7 +116,7 @@
         .btn-s-confirm { background: #27ae60; flex: 1; padding: 12px; border-radius: 10px; color: white; border: none; cursor: pointer; font-weight: bold; }
 
         /* =================================================== */
-        /* ★【相簿介面終極最佳化】：全面縮小圖片 + 提升防擋按鈕 */
+        /* ★【相簿介面終極調整】：經典 2x3 排列 + 圖片微縮防擠壓 */
         /* =================================================== */
         #gallery-overlay { 
             position: fixed; 
@@ -127,7 +127,7 @@
             display: none; 
             flex-direction: column; 
             z-index: 20000; 
-            overflow: hidden;    /* 強制阻斷外部拉伸，確保按紐鎖定在螢幕內 */
+            overflow: hidden;    /* 鎖定外框高度，避免元件被擠出手機螢幕外 */
         }
         .gallery-header { 
             padding: 12px 20px; 
@@ -139,20 +139,23 @@
         }
         #gallery-content { 
             flex: 1; 
-            padding: 10px; 
+            padding: 15px 10px; 
             display: grid; 
-            grid-template-columns: repeat(3, 1fr); /* 核心修改：改為 3 欄，圖片會大幅縮小 */
-            gap: 8px;                             /* 縮減間距省空間 */
+            grid-template-columns: repeat(2, 1fr); /* 聽從指示：改回 2 欄橫向排列 */
+            gap: 12px;                             
             align-content: start; 
-            overflow-y: auto;                      /* 超出範圍時在此區域內滾動 */
+            overflow-y: auto;                      /* 關鍵：內容過多時在此區塊內上下滾動 */
             -webkit-overflow-scrolling: touch;     
+            max-width: 340px;                      /* 核心優化：限制總寬度，讓 2 欄的圖片體積縮小，不顯得臃腫 */
+            margin: 0 auto;                        
+            width: 100%;
         }
         
         .photo-item { 
             width: 100%; 
             aspect-ratio: 1 / 1; 
             background: #000; 
-            border-radius: 8px; 
+            border-radius: 10px; 
             overflow: hidden; 
             border: 1px solid #444; 
             position: relative; 
@@ -164,8 +167,8 @@
             bottom: 0; 
             width: 100%; 
             background: rgba(0, 0, 0, 0.8); 
-            font-size: 0.7rem;   /* 字體縮小配合精緻小圖 */
-            padding: 3px 0; 
+            font-size: 0.75rem;   
+            padding: 4px 0; 
             color: #00ff00; 
             font-weight: bold; 
         }
@@ -178,8 +181,8 @@
             align-items: center; 
             gap: 15px; 
             border-top: 1px solid #444; 
-            /* 終極安全防禦：額外增加底部內縮邊距，把按鈕頂上去，避開 Safari 瀏覽器白條 */
-            padding-bottom: calc(30px + env(safe-area-inset-bottom)); 
+            /* 安全防禦：提高底部邊距，確保按鈕完美避開 Safari 底部小白條 */
+            padding-bottom: calc(25px + env(safe-area-inset-bottom)); 
         }
         /* =================================================== */
         
@@ -187,7 +190,7 @@
             background: #f39c12; 
             color: white; 
             border: none; 
-            padding: 8px 20px; 
+            padding: 8px 22px; 
             border-radius: 8px; 
             cursor: pointer; 
             font-weight: bold; 
@@ -290,7 +293,7 @@
 
         let allPhotos = []; 
         let currentPage = 1;
-        const itemsPerPage = 6; // 3欄小圖下，一頁 6 張剛好排滿 3x2 的黃金比例
+        const itemsPerPage = 6; // 核心設定：2欄 * 3列 = 限制單頁最多 6 張照片
         let isWaitingForThisResult = false;
 
         function openLightbox(imgSrc) {
