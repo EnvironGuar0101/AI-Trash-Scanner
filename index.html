@@ -11,10 +11,29 @@
         * { box-sizing: border-box; }
         body { font-family: sans-serif; text-align: center; background: #222; color: white; margin: 0; padding: 20px; }
         
-        #video-container { position: relative; display: inline-block; width: 100%; max-width: 500px; border: 5px solid #444; border-radius: 15px; overflow: hidden; background: #000; }
-        video { width: 100%; height: auto; display: block; }
-        #status { color: #00ff00; font-weight: bold; margin: 10px 0; min-height: 1.2em; }
+        /* =================================================== */
+        /* ★【畫面同步修正】：將相機外框與視訊全部強制鎖定為 1:1 正方形 */
+        /* =================================================== */
+        #video-container { 
+            position: relative; 
+            display: inline-block; 
+            width: 100%; 
+            max-width: 400px;      /* 調整最大寬度，讓正方形在手機上更精緻 */
+            aspect-ratio: 1 / 1;  /* 強制外框變成 1:1 正方形 */
+            border: 5px solid #444; 
+            border-radius: 15px; 
+            overflow: hidden; 
+            background: #000; 
+        }
+        video { 
+            width: 100%; 
+            height: 100%; 
+            object-fit: cover;    /* 核心：讓網頁視訊自動中央裁切，與拍攝結果 100% 一致！ */
+            display: block; 
+        }
+        /* =================================================== */
         
+        #status { color: #00ff00; font-weight: bold; margin: 10px 0; min-height: 1.2em; }
         .overlay-ui { margin-top: 20px; display: flex; flex-direction: column; align-items: center; }
         
         .button-group { 
@@ -57,17 +76,13 @@
         #settle-btn { background: #2980b9; color: white; }
         
         #album-btn:active, #settle-btn:active { transform: scale(0.9); }
-
-        /* =================================================== */
-        /* ★【新增】：結算按鈕禁用時的灰色樣式 (跟拍照按鈕一致) */
-        /* =================================================== */
         #settle-btn:disabled {
             background: #7f8c8d !important;
             cursor: not-allowed;
-            transform: none !important; /* 禁用時取消點擊縮放效果 */
+            transform: none !important;
         }
 
-        /* --- 圖片放大燈箱樣式 --- */
+        /* 圖片放大燈箱樣式 */
         #lightbox-overlay {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(0,0,0,0.95);
@@ -114,7 +129,6 @@
         
         .pagination-bar { padding: 20px; background: #222; display: flex; justify-content: center; align-items: center; gap: 20px; border-top: 1px solid #444; padding-bottom: 30px; }
         
-        /* --- 修正：分頁按鈕基礎樣式與禁用樣式 --- */
         .page-btn { 
             background: #f39c12; 
             color: white; 
@@ -124,13 +138,11 @@
             cursor: pointer; 
             font-weight: bold; 
         }
-        
-        /* 核心修正：當按鈕被 disabled 時顯示為暗灰色 */
         .page-btn:disabled {
-            background: #444 !important; /* 暗灰色 */
-            color: #888 !important;     /* 灰色文字 */
+            background: #444 !important; 
+            color: #888 !important;     
             cursor: not-allowed;
-            opacity: 1;                 /* 確保不會因為其他設置變透明 */
+            opacity: 1;                 
         }
         
         #notice-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); display: none; justify-content: center; align-items: center; z-index: 10000; backdrop-filter: blur(5px); }
@@ -210,19 +222,15 @@
         firebase.initializeApp(firebaseConfig);
         const database = firebase.database();
 
-        // ===================================================
-        // ★【核心升級：抓取網址參數裏的唯一 Player ID 房號】
-        // ===================================================
         const urlParams = new URLSearchParams(window.location.search);
         const playerId = urlParams.get('id') || "default_room"; 
         console.log("[房號綁定] 目前手機對接的 Unity 房間識別碼為:", playerId);
-        // ===================================================
 
         const video = document.getElementById('webcam');
         const canvas = document.getElementById('canvas');
         const statusText = document.getElementById('status');
         const captureBtn = document.getElementById('captureBtn');
-        const settleBtn = document.getElementById('settle-btn'); // 宣告結算按鈕變數
+        const settleBtn = document.getElementById('settle-btn'); 
         const galleryOverlay = document.getElementById('gallery-overlay');
 
         let allPhotos = []; 
@@ -262,19 +270,11 @@
         function closeSettlement() { document.getElementById('settle-overlay').style.display = 'none'; }
 
         function confirmSettlement() {
-            // 1. 計算每個垃圾類別各拍了幾張
             const counts = {};
-            allPhotos.forEach(p => { 
-                counts[p.label] = (counts[p.label] || 0) + 1; 
-            });
-
-            // 2. 【路徑更新】將統計結果精準寫入自己的房間資料夾裡
+            allPhotos.forEach(p => { counts[p.label] = (counts[p.label] || 0) + 1; });
             database.ref(`Players/${playerId}/ScanControl/categoryCounts`).set(counts);
-
-            // 3. 【路徑更新】將結算狀態設為 true，通知指定的 Unity 本機端
             database.ref(`Players/${playerId}/isScanned`).set(true);
 
-            // 以下保留原本的 Local 傳遞邏輯與關閉視窗代碼
             const resultData = { totalPhotos: allPhotos.length, photoDetails: allPhotos, categoryCounts: counts };
             const jsonString = JSON.stringify(resultData);
             try {
@@ -288,13 +288,13 @@
 
         async function startCamera() {
             try {
+                // 優化相機獲取參數
                 const stream = await navigator.mediaDevices.getUserMedia({ 
-                    video: { facingMode: "environment", width: { ideal: 640 }, height: { ideal: 480 } }, 
+                    video: { facingMode: "environment", width: { ideal: 640 }, height: { ideal: 640 } }, 
                     audio: false 
                 });
                 video.srcObject = stream;
                 
-                // 增加防呆顯示，讓你們測試時在手機上一眼就能確認是否成功連入房號
                 if(playerId === "default_room") {
                     statusText.innerHTML = "⚠️ 相機已開啟，但未帶入專屬房號";
                     statusText.style.color = "#ff4444";
@@ -314,12 +314,9 @@
         captureBtn.onclick = function() {
             statusText.innerText = "正在辨識...";
             captureBtn.disabled = true;
-            settleBtn.disabled = true; // 按下瞬間立刻將結算按鈕禁用變灰
+            settleBtn.disabled = true; 
             isWaitingForThisResult = true;
 
-            // ===================================================
-            // 🔥【核心修改】：強制將畫布設定為完美的 640 * 640 正方形
-            // ===================================================
             canvas.width = 640;
             canvas.height = 640;
             
@@ -327,30 +324,21 @@
             const vWidth = video.videoWidth;
             const vHeight = video.videoHeight;
             
-            // 💡 智慧型中央裁切演算法：取得視訊最短邊（通常直向是寬、橫向是高）
             const minSize = Math.min(vWidth, vHeight);
-            
-            // 計算起點，讓正方形剛好落在視訊的「正中央」，防止物件被拉扁或扯肥
             const sx = (vWidth - minSize) / 2;
             const sy = (vHeight - minSize) / 2;
             
-            // 擷取中央正方形，並完美縮放到 640x640 的畫布大小
+            // 裁切正中央區塊縮放到 640x640（這部分與 CSS 的 object-fit: cover 裁剪範圍完美契合！）
             ctx.drawImage(video, sx, sy, minSize, minSize, 0, 0, 640, 640);
             
-            // 轉存為品質 0.6 的縮小 JPEG Base64 字串
             const base64Data = canvas.toDataURL('image/jpeg', 0.6).split(',')[1];
-            // ===================================================
-            
-            // 【路徑更新】將上傳的照片與等待通知精準寫入特定的玩家房間裡
             database.ref(`Players/${playerId}/ScanControl`).update({ isWaitingForScan: true, imgData: base64Data, timestamp: Date.now() });
         };
 
         function initResultListener() {
-            // 【路徑更新】手機端只針對自己房間底下的結果進行動態監聽
             database.ref(`Players/${playerId}/ScanControl`).on('value', (snapshot) => {
                 const data = snapshot.val();
                 
-                // ★【核心修改】：根據 Firebase 的狀態動態鎖定或釋放結算按鈕 (防呆機制)
                 if (data) {
                     settleBtn.disabled = (data.isWaitingForScan === true);
                 }
@@ -366,8 +354,6 @@
                         };
                         allPhotos.unshift(newPhoto); 
                         renderGallery(); 
-                        
-                        // 【路徑更新】清除單次辨識完成後的暫存底圖
                         database.ref(`Players/${playerId}/ScanControl/resultImg`).set(null);
                     }
                 }
