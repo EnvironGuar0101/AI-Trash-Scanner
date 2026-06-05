@@ -286,7 +286,7 @@
                     return;
                 }
                 
-                statusText.innerText = "正在上傳圖片至雲端儲存空間...";
+                statusText.innerText = "辨識中...";
                 
                 // 產生不重複的檔名
                 const filename = `${playerId}_${Date.now()}.jpg`;
@@ -297,7 +297,7 @@
                     // 上傳完成後，向雲端索取公開下載網址 (Download URL)
                     return snapshot.ref.getDownloadURL();
                 }).then(downloadURL => {
-                    statusText.innerText = "圖片傳送完畢，通知 AI 進行辨識...";
+                    statusText.innerText = "辨識中...";
                     isWaitingForThisResult = true;
                     
                     // 改為寫入 imgUrl，廢棄 imgData！
