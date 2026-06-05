@@ -314,12 +314,32 @@
         captureBtn.onclick = function() {
             statusText.innerText = "正在辨識...";
             captureBtn.disabled = true;
-            settleBtn.disabled = true; // ★【修改】：按下瞬間立刻將結算按鈕禁用變灰，提供即時 UX 反饋
+            settleBtn.disabled = true; // 按下瞬間立刻將結算按鈕禁用變灰
             isWaitingForThisResult = true;
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
-            canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+
+            // ===================================================
+            // 🔥【核心修改】：強制將畫布設定為完美的 640 * 640 正方形
+            // ===================================================
+            canvas.width = 640;
+            canvas.height = 640;
+            
+            const ctx = canvas.getContext('2d');
+            const vWidth = video.videoWidth;
+            const vHeight = video.videoHeight;
+            
+            // 💡 智慧型中央裁切演算法：取得視訊最短邊（通常直向是寬、橫向是高）
+            const minSize = Math.min(vWidth, vHeight);
+            
+            // 計算起點，讓正方形剛好落在視訊的「正中央」，防止物件被拉扁或扯肥
+            const sx = (vWidth - minSize) / 2;
+            const sy = (vHeight - minSize) / 2;
+            
+            // 擷取中央正方形，並完美縮放到 640x640 的畫布大小
+            ctx.drawImage(video, sx, sy, minSize, minSize, 0, 0, 640, 640);
+            
+            // 轉存為品質 0.6 的縮小 JPEG Base64 字串
             const base64Data = canvas.toDataURL('image/jpeg', 0.6).split(',')[1];
+            // ===================================================
             
             // 【路徑更新】將上傳的照片與等待通知精準寫入特定的玩家房間裡
             database.ref(`Players/${playerId}/ScanControl`).update({ isWaitingForScan: true, imgData: base64Data, timestamp: Date.now() });
