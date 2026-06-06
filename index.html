@@ -176,7 +176,7 @@
 
         firebase.initializeApp(firebaseConfig);
         const database = firebase.database();
-        const storage = firebase.storage(); // 初始化 Storage
+        const storage = firebase.storage(); 
 
         const urlParams = new URLSearchParams(window.location.search);
         const playerId = urlParams.get('id') || "default_room"; 
@@ -201,7 +201,12 @@
         }
         function closeLightbox() { document.getElementById('lightbox-overlay').style.display = 'none'; }
 
+        // ★【修改點】：點擊結算按鈕時的安全防禦線，若無房號則彈出警告並阻斷
         function showSettlement() {
+            if (!urlParams.get('id')) {
+                alert("⚠️ 目前是以「無房號體驗模式」進入，系統不開放結算功能。");
+                return;
+            }
             const statsContainer = document.getElementById('settle-stats');
             const totalContainer = document.getElementById('settle-total-count');
             statsContainer.innerHTML = "";
@@ -253,9 +258,6 @@
         function openGallery() { galleryOverlay.style.display = 'flex'; renderGallery(); }
         function closeGallery() { galleryOverlay.style.display = 'none'; }
 
-        /* =================================================== */
-        /* ★【儲存優化】：拍照改為生成 Blob 並上傳至雲端 Storage */
-        /* =================================================== */
         captureBtn.onclick = function() {
             statusText.innerText = "正在擷取畫面...";
             captureBtn.disabled = true;
@@ -269,7 +271,9 @@
             
             if (!vWidth || !vHeight) {
                 alert("❌ 錯誤：相機尚未就緒，請重試或更換系統內建瀏覽器。");
-                captureBtn.disabled = false; settleBtn.disabled = false;
+                captureBtn.disabled = false; 
+                // ★【修改點】：若無房號，拍照出錯恢復時維持禁用
+                settleBtn.disabled = !urlParams.get('id');
                 return;
             }
 
@@ -278,29 +282,26 @@
             const sy = (vHeight - minSize) / 2;
             ctx.drawImage(video, sx, sy, minSize, minSize, 0, 0, 640, 640);
             
-            // 【核心重構】：不再轉 Base64 文字，直接輸出成二進位 JPEG Blob 檔案
             canvas.toBlob(function(blob) {
                 if (!blob) {
                     alert("❌ 錯誤：無法生成圖片檔案。");
-                    captureBtn.disabled = false; settleBtn.disabled = false;
+                    captureBtn.disabled = false; 
+                    // ★【修改點】：若無房號，維持禁用
+                    settleBtn.disabled = !urlParams.get('id');
                     return;
                 }
                 
                 statusText.innerText = "辨識中...";
                 
-                // 產生不重複的檔名
                 const filename = `${playerId}_${Date.now()}.jpg`;
                 const storageRef = storage.ref().child("scans/" + filename);
                 
-                // 開始上傳到 Firebase Storage
                 storageRef.put(blob).then(snapshot => {
-                    // 上傳完成後，向雲端索取公開下載網址 (Download URL)
                     return snapshot.ref.getDownloadURL();
                 }).then(downloadURL => {
                     statusText.innerText = "辨識中...";
                     isWaitingForThisResult = true;
                     
-                    // 改為寫入 imgUrl，廢棄 imgData！
                     database.ref(`Players/${playerId}/ScanControl`).update({ 
                         isWaitingForScan: true, 
                         imgUrl: downloadURL, 
@@ -309,23 +310,30 @@
                 }).catch(err => {
                     alert("❌ 雲端儲存上傳失敗：" + err.message + "\n請確認 Storage 權限規則已開啟。");
                     statusText.innerText = "❌ 上傳失敗";
-                    captureBtn.disabled = false; settleBtn.disabled = false;
+                    captureBtn.disabled = false; 
+                    // ★【修改點】：若無房號，維持禁用
+                    settleBtn.disabled = !urlParams.get('id');
                 });
 
-            }, 'image/jpeg', 0.75); // 品質設定 0.75，兼顧清晰度與大小
+            }, 'image/jpeg', 0.75); 
         };
 
         function initResultListener() {
             database.ref(`Players/${playerId}/ScanControl`).on('value', (snapshot) => {
                 const data = snapshot.val();
-                if (data) { settleBtn.disabled = (data.isWaitingForScan === true); }
+                
+                // ★【修改點】：在資料庫狀態變更時，強制鎖定無房號玩家的按鈕狀態
+                if (!urlParams.get('id')) {
+                    settleBtn.disabled = true;
+                } else if (data) { 
+                    settleBtn.disabled = (data.isWaitingForScan === true); 
+                }
 
                 if (isWaitingForThisResult && data && data.isWaitingForScan === false && data.scannedResult) {
                     isWaitingForThisResult = false;
                     statusText.innerText = "✅ 辨識結果：" + data.scannedResult;
                     captureBtn.disabled = false;
                     if (data.resultImg) {
-                        // 支援網址或 base64 回傳格式
                         const newPhoto = {
                             img: data.resultImg.startsWith('http') ? data.resultImg : (data.resultImg.startsWith('data:image') ? data.resultImg : 'data:image/jpeg;base64,' + data.resultImg),
                             label: data.scannedResult
@@ -365,6 +373,10 @@
         function changePage(step) { currentPage += step; renderGallery(); }
 
         window.addEventListener('load', () => {
+            // ★【修改點】：網頁剛開起來，若檢測到網址中沒有 ?id= 參數，直接禁用結算按鈕
+            if (!urlParams.get('id')) {
+                settleBtn.disabled = true;
+            }
             startCamera();
             initResultListener();
         });
