@@ -1,6 +1,6 @@
 # AI-Trash-Scanner
 
-這是一個基於 YOLOv8 的垃圾分類辨識系統，目前部署於 Hugging Face 雲端環境。
+這是一個基於 YOLOv8 的垃圾分類辨識系統，目前部署於 JUPYTER 環境。
 
 ## 功能特點
 - 使用 **YOLOv8** 進行影像辨識。
